@@ -129,6 +129,25 @@ export interface NowPlaying {
   endsAt: string;
 }
 
+/** A program slot in the on-screen guide. */
+export interface ScheduledProgram {
+  item: LibraryItem;
+  startUtc: string;
+  endUtc: string;
+}
+
+export interface CreateChannelRequest {
+  number: number;
+  name: string;
+  type?: ChannelType;
+  strategy?: ChannelStrategy;
+  onAir?: boolean;
+}
+
+export interface AddChannelItemsRequest {
+  libraryItemIds: number[];
+}
+
 export interface HealthResponse {
   status: "ok";
   version: string;
