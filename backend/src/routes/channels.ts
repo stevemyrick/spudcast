@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { Channel, NowPlaying, ScheduledProgram } from "@spudcast/shared";
-import { requireAuth } from "../auth-guards.js";
+import { requireAuth, requireViewer } from "../auth-guards.js";
 import {
   addItems,
   createChannel,
@@ -32,8 +32,10 @@ function canEdit(channel: Channel, user: { id: number; role: string }): boolean 
 
 export async function channelRoutes(app: FastifyInstance): Promise<void> {
   // The shared on-air lineup the TV sees; full list (incl. off-air) for editors.
-  app.get("/api/channels", { preHandler: requireAuth }, async (req): Promise<Channel[]> => {
-    const all = (req.query as { all?: string })?.all === "true";
+  // Devices only ever get the on-air lineup; `all=true` is honored for users.
+  app.get("/api/channels", { preHandler: requireViewer }, async (req): Promise<Channel[]> => {
+    const wantsAll = (req.query as { all?: string })?.all === "true";
+    const all = wantsAll && Boolean(req.currentUser);
     return listChannels({ onAirOnly: !all });
   });
 
@@ -72,13 +74,13 @@ export async function channelRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // "What's on channel N now?" — reads only from the SQLite cache.
-  app.get("/api/now-playing/:number", { preHandler: requireAuth }, async (req, reply): Promise<NowPlaying | void> => {
+  app.get("/api/now-playing/:number", { preHandler: requireViewer }, async (req, reply): Promise<NowPlaying | void> => {
     const np = nowPlaying(Number((req.params as { number: string }).number));
     if (!np) return reply.code(404).send({ error: "Nothing scheduled" });
     return np;
   });
 
-  app.get("/api/guide/:number", { preHandler: requireAuth }, async (req): Promise<ScheduledProgram[]> => {
+  app.get("/api/guide/:number", { preHandler: requireViewer }, async (req): Promise<ScheduledProgram[]> => {
     const count = Math.min(Math.max(Number((req.query as { count?: string })?.count) || 8, 1), 50);
     return getGuide(Number((req.params as { number: string }).number), count);
   });

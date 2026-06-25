@@ -3,14 +3,14 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
 import { artworkCacheDir } from "../config.js";
-import { requireAuth } from "../auth-guards.js";
+import { requireViewer } from "../auth-guards.js";
 import { fetchImage } from "../services/jellyfin.js";
 
 // Jellyfin item ids are 32-char hex GUIDs; restrict to that to avoid traversal.
 const ID_RE = /^[a-f0-9]{32}$/i;
 
 export async function artRoutes(app: FastifyInstance): Promise<void> {
-  app.get("/api/art/jellyfin/:id", { preHandler: requireAuth }, async (req, reply) => {
+  app.get("/api/art/jellyfin/:id", { preHandler: requireViewer }, async (req, reply) => {
     const { id } = req.params as { id: string };
     if (!ID_RE.test(id)) {
       return reply.code(400).send({ error: "Invalid id" });

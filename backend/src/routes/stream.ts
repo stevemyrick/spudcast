@@ -1,6 +1,6 @@
 import { Readable } from "node:stream";
 import type { FastifyInstance } from "fastify";
-import { requireAuth } from "../auth-guards.js";
+import { requireViewer } from "../auth-guards.js";
 import { buildStreamUrl } from "../services/jellyfin.js";
 
 const ID_RE = /^[a-f0-9]{32}$/i;
@@ -11,7 +11,7 @@ const PASS_HEADERS = ["content-type", "content-length", "content-range", "accept
 export async function streamRoutes(app: FastifyInstance): Promise<void> {
   // Proxy a Jellyfin direct-play stream. The api_key is injected server-side and
   // never reaches the browser; Range requests are forwarded for seeking.
-  app.get("/api/stream/jellyfin/:id", { preHandler: requireAuth }, async (req, reply) => {
+  app.get("/api/stream/jellyfin/:id", { preHandler: requireViewer }, async (req, reply) => {
     const { id } = req.params as { id: string };
     if (!ID_RE.test(id)) return reply.code(400).send({ error: "Invalid id" });
 
