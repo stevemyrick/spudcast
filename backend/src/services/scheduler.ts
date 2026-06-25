@@ -1,5 +1,5 @@
 import type { Channel, LibraryItem, NowPlaying } from "@spudcast/shared";
-import { getByNumber, getItems } from "./channels.js";
+import { getByNumber, resolveChannelItems } from "./channels.js";
 
 /**
  * Fixed anchor for the linear schedule. A channel's loop is a pure function of
@@ -32,8 +32,8 @@ interface LoopState {
   currentStartMs: number;
 }
 
-function loopState(channelId: number, nowMs: number): LoopState | null {
-  const items = getItems(channelId);
+function loopState(channel: Channel, nowMs: number): LoopState | null {
+  const items = resolveChannelItems(channel);
   if (items.length === 0) return null;
   const totalMs = items.reduce((sum, it) => sum + safeDuration(it), 0);
   if (totalMs <= 0) return null;
@@ -61,7 +61,7 @@ export function nowPlaying(channelNumber: number): NowPlaying | null {
 }
 
 export function nowPlayingForChannel(channel: Channel): NowPlaying | null {
-  const state = loopState(channel.id, Date.now());
+  const state = loopState(channel, Date.now());
   if (!state) return null;
   const item = state.items[state.index];
   const endMs = state.currentStartMs + safeDuration(item);
@@ -80,7 +80,7 @@ export function nowPlayingForChannel(channel: Channel): NowPlaying | null {
 export function getGuide(channelNumber: number, count = 8): ScheduledProgram[] {
   const channel = getByNumber(channelNumber);
   if (!channel) return [];
-  const state = loopState(channel.id, Date.now());
+  const state = loopState(channel, Date.now());
   if (!state) return [];
 
   const programs: ScheduledProgram[] = [];

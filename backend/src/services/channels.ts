@@ -1,5 +1,6 @@
-import type { Channel, ChannelStrategy, ChannelType, LibraryItem } from "@spudcast/shared";
+import type { AutoRules, Channel, ChannelStrategy, ChannelType, LibraryItem } from "@spudcast/shared";
 import { db } from "../db.js";
+import { queryByRules } from "./library.js";
 
 interface ChannelRow {
   id: number;
@@ -37,13 +38,14 @@ export interface CreateChannelInput {
   type?: ChannelType;
   strategy?: ChannelStrategy;
   onAir?: boolean;
+  rules?: AutoRules;
 }
 
 export function createChannel(ownerId: number, input: CreateChannelInput): Channel {
   const info = db
     .prepare(
-      `INSERT INTO channels (number, name, ownerId, onAir, type, strategy, enabled)
-       VALUES (@number, @name, @ownerId, @onAir, @type, @strategy, 1)`,
+      `INSERT INTO channels (number, name, ownerId, onAir, type, strategy, rules, enabled)
+       VALUES (@number, @name, @ownerId, @onAir, @type, @strategy, @rules, 1)`,
     )
     .run({
       number: input.number,
@@ -52,6 +54,7 @@ export function createChannel(ownerId: number, input: CreateChannelInput): Chann
       onAir: input.onAir ? 1 : 0,
       type: input.type ?? "manual",
       strategy: input.strategy ?? "ordered",
+      rules: input.rules ? JSON.stringify(input.rules) : null,
     });
   return getById(Number(info.lastInsertRowid))!;
 }
@@ -129,7 +132,38 @@ export function addItems(channelId: number, libraryItemIds: number[]): void {
   tx();
 }
 
-/** The ordered library items that make up a channel's loop. */
+/** Small deterministic PRNG so an auto channel's shuffle is stable across calls. */
+function seededShuffle<T>(arr: T[], seed: number): T[] {
+  let s = seed >>> 0 || 1;
+  const rand = () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const out = arr.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+/**
+ * The items that make up a channel's loop. Manual channels use their stored
+ * playlist; auto channels resolve their rules live (so newly-synced content
+ * flows in), with a stable shuffle when the strategy calls for it.
+ */
+export function resolveChannelItems(channel: Channel): LibraryItem[] {
+  if (channel.type === "auto") {
+    const items = queryByRules((channel.rules ?? {}) as AutoRules);
+    return channel.strategy === "shuffle" ? seededShuffle(items, channel.id) : items;
+  }
+  return getItems(channel.id);
+}
+
+/** The ordered library items that make up a manual channel's loop. */
 export function getItems(channelId: number): LibraryItem[] {
   const rows = db
     .prepare(

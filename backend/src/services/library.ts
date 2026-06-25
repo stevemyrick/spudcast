@@ -1,4 +1,5 @@
 import type {
+  AutoRules,
   LibraryItem,
   LibraryItemType,
   LibraryPage,
@@ -147,6 +148,54 @@ export function getByExternalId(
     .prepare("SELECT * FROM library_items WHERE source = ? AND externalId = ?")
     .get(source, externalId) as LibraryRow | undefined;
   return row ? rowToItem(row) : undefined;
+}
+
+/**
+ * Resolve an auto-channel's rules to a deterministic, ordered set of items.
+ * Re-running picks up newly-synced content automatically (that's the point).
+ * Genres are matched against the JSON array column with LIKE.
+ */
+export function queryByRules(rules: AutoRules): LibraryItem[] {
+  const where: string[] = [];
+  const args: Record<string, unknown> = {};
+
+  if (rules.types?.length) {
+    where.push(`type IN (${rules.types.map((_, i) => `@t${i}`).join(",")})`);
+    rules.types.forEach((t, i) => (args[`t${i}`] = t));
+  }
+  if (rules.sources?.length) {
+    where.push(`source IN (${rules.sources.map((_, i) => `@s${i}`).join(",")})`);
+    rules.sources.forEach((s, i) => (args[`s${i}`] = s));
+  }
+  if (rules.yearFrom != null) {
+    where.push("year >= @yearFrom");
+    args.yearFrom = rules.yearFrom;
+  }
+  if (rules.yearTo != null) {
+    where.push("year <= @yearTo");
+    args.yearTo = rules.yearTo;
+  }
+  if (rules.genres?.length) {
+    // Match any of the requested genres (OR within the genre group).
+    const ors = rules.genres.map((_, i) => `genres LIKE @g${i}`);
+    where.push(`(${ors.join(" OR ")})`);
+    rules.genres.forEach((g, i) => (args[`g${i}`] = `%"${g}"%`));
+  }
+
+  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  const limit = Math.min(Math.max(rules.limit ?? 500, 1), 2000);
+  const rows = db
+    .prepare(`SELECT * FROM library_items ${whereSql} ORDER BY id LIMIT ${limit}`)
+    .all(args) as LibraryRow[];
+  return rows.map(rowToItem);
+}
+
+/** Distinct genres across the cached library, for the auto-channel wizard. */
+export function distinctGenres(): string[] {
+  const rows = db.prepare("SELECT genres FROM library_items").all() as Array<{ genres: string }>;
+  const set = new Set<string>();
+  for (const r of rows) for (const g of JSON.parse(r.genres) as string[]) set.add(g);
+  return [...set].sort((a, b) => a.localeCompare(b));
 }
 
 /** Filtered, paginated listing for the admin library browser. */

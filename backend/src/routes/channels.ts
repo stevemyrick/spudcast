@@ -9,6 +9,7 @@ import {
   getById,
   getItems,
   listChannels,
+  resolveChannelItems,
   setItems,
   setOnAir,
   updateChannel,
@@ -16,12 +17,22 @@ import {
 import { getGuide, nowPlaying } from "../services/scheduler.js";
 import { getById as getLibraryItem } from "../services/library.js";
 
+const rulesSchema = z.object({
+  genres: z.array(z.string().max(64)).max(40).optional(),
+  yearFrom: z.number().int().min(1870).max(2100).optional(),
+  yearTo: z.number().int().min(1870).max(2100).optional(),
+  types: z.array(z.enum(["movie", "episode", "commercial", "bumper", "music_video"])).optional(),
+  sources: z.array(z.enum(["jellyfin", "youtube", "local"])).optional(),
+  limit: z.number().int().min(1).max(2000).optional(),
+});
+
 const createSchema = z.object({
   number: z.number().int().min(1).max(9999),
   name: z.string().min(1).max(120),
   type: z.enum(["manual", "auto", "weather"]).optional(),
   strategy: z.enum(["ordered", "shuffle", "dayparts"]).optional(),
   onAir: z.boolean().optional(),
+  rules: rulesSchema.optional(),
 });
 
 const itemsSchema = z.object({
@@ -70,7 +81,8 @@ export async function channelRoutes(app: FastifyInstance): Promise<void> {
     const channel = getById(Number((req.params as { id: string }).id));
     if (!channel) return reply.code(404).send({ error: "Channel not found" });
     if (!canEdit(channel, req.currentUser!)) return reply.code(403).send({ error: "Not your channel" });
-    return { channel, items: getItems(channel.id) };
+    // Auto channels resolve their lineup from rules; manual use the stored playlist.
+    return { channel, items: resolveChannelItems(channel) };
   });
 
   app.put("/api/channels/:id", { preHandler: requireAuth }, async (req, reply): Promise<Channel | void> => {

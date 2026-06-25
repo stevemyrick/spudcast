@@ -136,12 +136,25 @@ export interface ScheduledProgram {
   endUtc: string;
 }
 
+/** Filter rules for an auto-generated channel. All fields are optional/ANDed. */
+export interface AutoRules {
+  genres?: string[];
+  /** Inclusive production-year bounds (e.g. 1990–1999 for a 90s channel). */
+  yearFrom?: number;
+  yearTo?: number;
+  types?: LibraryItemType[];
+  sources?: LibrarySource[];
+  /** Max programs to pull into the loop. */
+  limit?: number;
+}
+
 export interface CreateChannelRequest {
   number: number;
   name: string;
   type?: ChannelType;
   strategy?: ChannelStrategy;
   onAir?: boolean;
+  rules?: AutoRules;
 }
 
 export interface AddChannelItemsRequest {

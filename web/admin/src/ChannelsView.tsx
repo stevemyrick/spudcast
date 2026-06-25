@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Channel, LibraryItem, SessionInfo } from "@spudcast/shared";
 import { api, readDurationMs } from "./api.js";
+import { AutoChannelWizard } from "./AutoChannelWizard.js";
 
 function fmtDur(ms: number): string {
   const m = Math.round(ms / 60000);
@@ -13,6 +14,7 @@ export function ChannelsView({ session }: { session: SessionInfo }) {
   const myId = session.user?.id;
   const [channels, setChannels] = useState<Channel[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [wizard, setWizard] = useState(false);
   const [newNumber, setNewNumber] = useState("");
   const [newName, setNewName] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
@@ -52,12 +54,28 @@ export function ChannelsView({ session }: { session: SessionInfo }) {
     );
   }
 
+  if (wizard) {
+    return (
+      <AutoChannelWizard
+        onCancel={() => setWizard(false)}
+        onCreated={() => {
+          setWizard(false);
+          loadChannels();
+        }}
+      />
+    );
+  }
+
   return (
     <div className="panel">
-      <h2>Channels</h2>
+      <div className="row">
+        <h2 style={{ margin: 0 }}>Channels</h2>
+        <span className="spacer" />
+        <button className="ghost" onClick={() => setWizard(true)}>✨ Auto channel</button>
+      </div>
       <form className="row" onSubmit={create}>
         <input placeholder="#" value={newNumber} onChange={(e) => setNewNumber(e.target.value)} style={{ width: 70 }} required />
-        <input placeholder="Channel name" className="grow" value={newName} onChange={(e) => setNewName(e.target.value)} required />
+        <input placeholder="New manual channel name" className="grow" value={newName} onChange={(e) => setNewName(e.target.value)} required />
         <button type="submit">Create</button>
       </form>
       {msg && <p className="error small">{msg}</p>}
@@ -67,6 +85,7 @@ export function ChannelsView({ session }: { session: SessionInfo }) {
           <div className="list-item" key={c.id}>
             <span className="ch-pill">{c.number}</span>
             <span className="title">{c.name}</span>
+            {c.type === "auto" && <span className="badge">auto</span>}
             {c.onAir ? <span className="badge on">ON AIR</span> : <span className="badge">off air</span>}
             <span className="spacer" />
             <button className="ghost" onClick={() => setEditingId(c.id)}>Edit</button>
@@ -134,6 +153,7 @@ function ChannelEditor({ channelId, onBack }: { channelId: number; onBack: () =>
   }
 
   const totalMs = items.reduce((s, it) => s + it.durationMs, 0);
+  const isAuto = channel.type === "auto";
 
   return (
     <div className="panel wide">
@@ -141,37 +161,59 @@ function ChannelEditor({ channelId, onBack }: { channelId: number; onBack: () =>
         <button className="ghost" onClick={onBack}>← Channels</button>
         <span className="ch-pill">{channel.number}</span>
         <input value={channel.name} onChange={(e) => setChannel({ ...channel, name: e.target.value })} onBlur={(e) => rename(e.target.value)} className="grow" />
+        {isAuto && <span className="badge">auto</span>}
         <button className={channel.onAir ? "" : "ghost"} onClick={toggleOnAir}>
           {channel.onAir ? "On air" : "Off air"}
         </button>
         <button className="ghost danger" onClick={del}>Delete</button>
       </div>
 
-      <div className="two-col">
+      {isAuto ? (
         <div>
-          <h3>Playlist · {items.length} items · {fmtDur(totalMs)} loop</h3>
-          <div className="list">
+          <h3>Auto lineup · {items.length} programs · {fmtDur(totalMs)} loop</h3>
+          <p className="muted small">
+            Programs are chosen automatically from this channel’s rules and refresh as your library grows.
+          </p>
+          <div className="list tall">
             {items.map((it, i) => (
               <div className="list-item" key={`${it.id}-${i}`}>
                 <span className="ord">{i + 1}</span>
                 <span className="title">{it.title}</span>
                 <span className="spacer" />
+                <span className="muted small">{it.year ?? ""}</span>
                 <span className="muted small">{fmtDur(it.durationMs)}</span>
-                <button className="mini" onClick={() => move(i, -1)} disabled={i === 0}>↑</button>
-                <button className="mini" onClick={() => move(i, 1)} disabled={i === items.length - 1}>↓</button>
-                <button className="mini" onClick={() => remove(i)}>✕</button>
               </div>
             ))}
-            {items.length === 0 && <p className="muted">Empty. Add programs from the library →</p>}
-          </div>
-          <div className="row">
-            <button onClick={savePlaylist} disabled={!dirty}>{dirty ? "Save playlist" : "Saved"}</button>
-            {msg && <span className="muted small">{msg}</span>}
+            {items.length === 0 && <p className="muted">No matching programs yet.</p>}
           </div>
         </div>
+      ) : (
+        <div className="two-col">
+          <div>
+            <h3>Playlist · {items.length} items · {fmtDur(totalMs)} loop</h3>
+            <div className="list">
+              {items.map((it, i) => (
+                <div className="list-item" key={`${it.id}-${i}`}>
+                  <span className="ord">{i + 1}</span>
+                  <span className="title">{it.title}</span>
+                  <span className="spacer" />
+                  <span className="muted small">{fmtDur(it.durationMs)}</span>
+                  <button className="mini" onClick={() => move(i, -1)} disabled={i === 0}>↑</button>
+                  <button className="mini" onClick={() => move(i, 1)} disabled={i === items.length - 1}>↓</button>
+                  <button className="mini" onClick={() => remove(i)}>✕</button>
+                </div>
+              ))}
+              {items.length === 0 && <p className="muted">Empty. Add programs from the library →</p>}
+            </div>
+            <div className="row">
+              <button onClick={savePlaylist} disabled={!dirty}>{dirty ? "Save playlist" : "Saved"}</button>
+              {msg && <span className="muted small">{msg}</span>}
+            </div>
+          </div>
 
-        <LibraryPicker onAdd={add} onUploaded={add} />
-      </div>
+          <LibraryPicker onAdd={add} onUploaded={add} />
+        </div>
+      )}
     </div>
   );
 }

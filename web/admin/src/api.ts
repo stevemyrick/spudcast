@@ -1,4 +1,5 @@
 import type {
+  AutoRules,
   Channel,
   ChannelWithItems,
   ConnectionTestResult,
@@ -59,6 +60,12 @@ export const api = {
   syncStatus: () => jsonFetch<SyncStatus>("/api/library/sync-status"),
   refreshLibrary: () =>
     jsonFetch<LibrarySyncResult>("/api/library/refresh", { method: "POST" }),
+  genres: () => jsonFetch<string[]>("/api/library/genres"),
+  previewRules: (rules: AutoRules) =>
+    jsonFetch<{ count: number; sample: string[] }>("/api/library/preview", {
+      method: "POST",
+      body: JSON.stringify(rules),
+    }),
 
   // --- Settings ---
   getSettings: () => jsonFetch<SettingsView>("/api/settings"),

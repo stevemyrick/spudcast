@@ -153,3 +153,11 @@ button.danger { color: var(--error); border-color: var(--error); }
   border: 1px dashed var(--border); border-radius: 8px; padding: 12px; color: var(--muted);
 }
 .upload:hover { border-color: var(--accent); color: var(--ink); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  margin: 0; padding: 6px 12px; border-radius: 999px; cursor: pointer;
+  background: #0c1322; color: var(--muted); border: 1px solid var(--border); font-size: 0.85rem;
+}
+.chip.on { background: var(--accent); color: #06210f; border-color: var(--accent); font-weight: 700; }
+.preview { color: var(--ink); background: #0c1322; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }

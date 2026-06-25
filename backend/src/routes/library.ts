@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { LibraryPage, LibrarySyncResult, SyncStatus } from "@spudcast/shared";
 import { requireAdmin, requireAuth } from "../auth-guards.js";
-import { list } from "../services/library.js";
+import { distinctGenres, list, queryByRules } from "../services/library.js";
 import { getSyncStatus, syncLibrary } from "../services/sync.js";
 
 const querySchema = z.object({
@@ -31,6 +31,18 @@ export async function libraryRoutes(app: FastifyInstance): Promise<void> {
     { preHandler: requireAuth },
     async (): Promise<SyncStatus> => getSyncStatus(),
   );
+
+  // Distinct genres for the auto-channel wizard.
+  app.get("/api/library/genres", { preHandler: requireAuth }, async (): Promise<string[]> =>
+    distinctGenres(),
+  );
+
+  // Preview how many programs an auto-channel rule set would match.
+  app.post("/api/library/preview", { preHandler: requireAuth }, async (req) => {
+    const rules = (req.body ?? {}) as Record<string, unknown>;
+    const items = queryByRules(rules);
+    return { count: items.length, sample: items.slice(0, 8).map((i) => i.title) };
+  });
 
   app.post(
     "/api/library/refresh",
