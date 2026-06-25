@@ -1,6 +1,8 @@
 node_modules/
 dist/
 build/
+# backend production bundle of the built frontends (assembled at deploy)
+backend/public/
 *.log
 
 # spudcast runtime data (db, cache, uploads)

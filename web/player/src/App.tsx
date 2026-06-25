@@ -1,29 +1,15 @@
-import { useEffect, useState } from "react";
-import type { HealthResponse } from "@spudcast/shared";
+import { useState } from "react";
+import { getToken } from "./api.js";
+import { Pairing } from "./Pairing.js";
+import { Player } from "./Player.js";
 
 /**
- * M0 placeholder TV screen. The channel state machine, video playback, overlays
- * and device pairing land in M2.
+ * The TV. If this device isn't paired yet, show the pairing code; once paired,
+ * become the full-screen player. The channel state machine, overlays, static
+ * transition and failover slate all live in <Player>.
  */
 export function App() {
-  const [online, setOnline] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    fetch("/health")
-      .then((r) => r.json() as Promise<HealthResponse>)
-      .then((h) => setOnline(h.status === "ok"))
-      .catch(() => setOnline(false));
-  }, []);
-
-  return (
-    <div className="tv">
-      <div className="static" aria-hidden />
-      <div className="screen">
-        <h1 className="brand">spudcast</h1>
-        <p className="status">
-          {online === null ? "Tuning…" : online ? "Please stand by" : "No signal"}
-        </p>
-      </div>
-    </div>
-  );
+  const [paired, setPaired] = useState(() => Boolean(getToken()));
+  if (!paired) return <Pairing onPaired={() => setPaired(true)} />;
+  return <Player />;
 }

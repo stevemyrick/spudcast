@@ -64,4 +64,17 @@ export const api = {
     }),
   testJellyfin: () =>
     jsonFetch<ConnectionTestResult>("/api/settings/jellyfin/test", { method: "POST" }),
+
+  // --- Devices (TV pairing) ---
+  listDevices: () =>
+    jsonFetch<Array<{ id: number; name: string; kind: string; lastSeen: string | null }>>(
+      "/api/devices",
+    ),
+  claimDevice: (code: string, name: string) =>
+    jsonFetch<{ id: number; name: string; kind: string }>("/api/devices/pair/claim", {
+      method: "POST",
+      body: JSON.stringify({ code, name }),
+    }),
+  revokeDevice: (id: number) =>
+    jsonFetch<{ ok: boolean }>(`/api/devices/${id}`, { method: "DELETE" }),
 };

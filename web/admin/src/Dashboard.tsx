@@ -3,8 +3,9 @@ import type { SessionInfo } from "@spudcast/shared";
 import { api } from "./api.js";
 import { LibraryView } from "./LibraryView.js";
 import { SettingsView } from "./SettingsView.js";
+import { DevicesView } from "./DevicesView.js";
 
-type Tab = "library" | "settings";
+type Tab = "library" | "devices" | "settings";
 
 /** Home shell once setup + login are complete. Channel building lands in M3. */
 export function Dashboard({ session, onLogout }: { session: SessionInfo; onLogout: () => void }) {
@@ -23,6 +24,9 @@ export function Dashboard({ session, onLogout }: { session: SessionInfo; onLogou
         <nav className="tabs">
           <button className={tab === "library" ? "tab active" : "tab"} onClick={() => setTab("library")}>Library</button>
           {isAdmin && (
+            <button className={tab === "devices" ? "tab active" : "tab"} onClick={() => setTab("devices")}>Devices</button>
+          )}
+          {isAdmin && (
             <button className={tab === "settings" ? "tab active" : "tab"} onClick={() => setTab("settings")}>Settings</button>
           )}
         </nav>
@@ -32,6 +36,7 @@ export function Dashboard({ session, onLogout }: { session: SessionInfo; onLogou
       </header>
       <main className="content">
         {tab === "library" && <LibraryView />}
+        {tab === "devices" && isAdmin && <DevicesView />}
         {tab === "settings" && isAdmin && <SettingsView />}
       </main>
     </div>
