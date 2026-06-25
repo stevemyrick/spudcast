@@ -155,6 +155,36 @@ export interface HealthResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Remote control (phone remote <-> TV over WebSocket)
+// ---------------------------------------------------------------------------
+
+export type RemoteAction =
+  | "channel_up"
+  | "channel_down"
+  | "set_channel"
+  | "toggle_guide"
+  | "toggle_mute";
+
+export interface RemoteCommand {
+  action: RemoteAction;
+  /** Target channel number for set_channel. */
+  number?: number;
+}
+
+/** Messages the client sends over the control socket. */
+export type ControlClientMessage =
+  | { role: "tv"; token: string }
+  | { role: "remote"; code: string }
+  | ({ type: "command" } & RemoteCommand);
+
+/** Messages the server sends over the control socket. */
+export type ControlServerMessage =
+  | { type: "room"; code: string }
+  | { type: "joined" }
+  | { type: "error"; message: string }
+  | ({ type: "command" } & RemoteCommand);
+
+// ---------------------------------------------------------------------------
 // Library sync & queries
 // ---------------------------------------------------------------------------
 

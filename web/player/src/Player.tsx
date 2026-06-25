@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Channel, NowPlaying } from "@spudcast/shared";
-import { playerApi } from "./api.js";
+import type { Channel, ControlServerMessage, NowPlaying, RemoteCommand } from "@spudcast/shared";
+import { controlSocketUrl, getToken, playerApi } from "./api.js";
 import { Guide } from "./Guide.js";
 
 type Phase = "loading" | "static" | "playing" | "standby";
@@ -17,6 +17,8 @@ export function Player() {
   const [bugVisible, setBugVisible] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [aspect, setAspect] = useState<AspectMode>("contain");
+  const [muted, setMuted] = useState(false);
+  const [roomCode, setRoomCode] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const bugTimer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -101,6 +103,59 @@ export function Player() {
     [channels.length],
   );
 
+  // Apply a remote-control command. Held in a ref so the WS handler always sees
+  // the latest version without re-subscribing.
+  const applyCommand = useCallback(
+    (cmd: RemoteCommand) => {
+      switch (cmd.action) {
+        case "channel_up":
+          changeChannel(1);
+          break;
+        case "channel_down":
+          changeChannel(-1);
+          break;
+        case "set_channel": {
+          const i = channels.findIndex((c) => c.number === cmd.number);
+          if (i >= 0) setIndex(i);
+          break;
+        }
+        case "toggle_guide":
+          setShowGuide((s) => !s);
+          break;
+        case "toggle_mute":
+          setMuted((m) => !m);
+          break;
+      }
+    },
+    [changeChannel, channels],
+  );
+  const applyRef = useRef(applyCommand);
+  applyRef.current = applyCommand;
+
+  // Connect to the control socket so a paired phone remote can drive this TV.
+  useEffect(() => {
+    const token = getToken();
+    if (!token) return;
+    const ws = new WebSocket(controlSocketUrl());
+    ws.onopen = () => ws.send(JSON.stringify({ role: "tv", token }));
+    ws.onmessage = (ev) => {
+      let msg: ControlServerMessage;
+      try {
+        msg = JSON.parse(ev.data) as ControlServerMessage;
+      } catch {
+        return;
+      }
+      if (msg.type === "room") setRoomCode(msg.code);
+      else if (msg.type === "command") applyRef.current(msg);
+    };
+    return () => ws.close();
+  }, []);
+
+  // Keep the video element's muted state in sync.
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.muted = muted;
+  }, [muted, streamSrc]);
+
   // Keyboard control (arrow/page up-down, 'g' guide, 'a' aspect).
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -170,8 +225,15 @@ export function Player() {
       )}
 
       {showGuide && current && (
-        <Guide channels={channels} currentNumber={current.number} onClose={() => setShowGuide(false)} />
+        <Guide
+          channels={channels}
+          currentNumber={current.number}
+          roomCode={roomCode}
+          onClose={() => setShowGuide(false)}
+        />
       )}
+
+      {muted && <div className="mute-badge">MUTED</div>}
     </div>
   );
 }

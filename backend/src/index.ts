@@ -15,6 +15,7 @@ import { artRoutes } from "./routes/art.js";
 import { channelRoutes } from "./routes/channels.js";
 import { streamRoutes } from "./routes/stream.js";
 import { deviceRoutes } from "./routes/devices.js";
+import { controlRoutes } from "./routes/control.js";
 import { startSyncSchedule } from "./services/syncSchedule.js";
 
 async function main(): Promise<void> {
@@ -41,6 +42,7 @@ async function main(): Promise<void> {
   await app.register(channelRoutes);
   await app.register(streamRoutes);
   await app.register(deviceRoutes);
+  await app.register(controlRoutes);
 
   // Serve the built frontends in production: admin at /, player at /tv.
   const adminDir = join(config.webDir, "admin");

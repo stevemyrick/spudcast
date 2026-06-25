@@ -51,3 +51,9 @@ export const playerApi = {
   artUrl: (path: string) =>
     `${path}?token=${encodeURIComponent(getToken() ?? "")}`,
 };
+
+/** WebSocket URL for the remote-control channel (same origin). */
+export function controlSocketUrl(): string {
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  return `${proto}://${location.host}/api/control`;
+}

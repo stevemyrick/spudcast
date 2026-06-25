@@ -10,10 +10,12 @@ function hhmm(iso: string): string {
 export function Guide({
   channels,
   currentNumber,
+  roomCode,
   onClose,
 }: {
   channels: Channel[];
   currentNumber: number;
+  roomCode: string | null;
   onClose: () => void;
 }) {
   const [rows, setRows] = useState<Record<number, ScheduledProgram[]>>({});
@@ -54,7 +56,10 @@ export function Guide({
           );
         })}
       </div>
-      <div className="guide-foot">Press G to close</div>
+      <div className="guide-foot">
+        {roomCode ? <>Remote: open <b>/tv/remote</b> and enter code <b>{roomCode}</b> · </> : null}
+        Press G to close
+      </div>
     </div>
   );
 }
