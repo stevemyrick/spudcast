@@ -1,4 +1,4 @@
-import type { Channel, NowPlaying, ScheduledProgram } from "@spudcast/shared";
+import type { Channel, LibraryItem, NowPlaying, ScheduledProgram } from "@spudcast/shared";
 
 const TOKEN_KEY = "spud_device_token";
 
@@ -45,9 +45,12 @@ export const playerApi = {
   guide: (channelNumber: number, count = 8) =>
     viewerFetch<ScheduledProgram[]>(`/api/guide/${channelNumber}?count=${count}`),
 
-  /** Stream URL for a Jellyfin item, carrying the device token for <video>. */
-  streamUrl: (jellyfinId: string) =>
-    `/api/stream/jellyfin/${jellyfinId}?token=${encodeURIComponent(getToken() ?? "")}`,
+  /** Stream URL for an item (source-aware), carrying the device token for <video>. */
+  streamUrlForItem: (item: LibraryItem) => {
+    const t = encodeURIComponent(getToken() ?? "");
+    if (item.source === "local") return `/api/stream/local/${item.id}?token=${t}`;
+    return `/api/stream/jellyfin/${item.streamRef}?token=${t}`;
+  },
   artUrl: (path: string) =>
     `${path}?token=${encodeURIComponent(getToken() ?? "")}`,
 };

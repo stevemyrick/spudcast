@@ -126,3 +126,30 @@ code { background: #0c1322; padding: 1px 6px; border-radius: 5px; }
   font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em;
   background: #1d2a44; color: var(--muted); padding: 2px 7px; border-radius: 999px;
 }
+.badge.on { background: rgba(74,222,128,0.15); color: var(--accent); }
+
+.panel.wide { width: min(1100px, 100%); }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+@media (max-width: 800px) { .two-col { grid-template-columns: 1fr; } }
+
+.ch-pill {
+  font-weight: 800; color: var(--accent); background: #0c1322; border: 1px solid var(--border);
+  border-radius: 8px; padding: 2px 10px; min-width: 38px; text-align: center;
+}
+.ord { color: var(--muted); width: 22px; text-align: right; font-variant-numeric: tabular-nums; }
+
+button.mini {
+  margin: 0; padding: 4px 9px; background: #1d2a44; color: var(--ink);
+  border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem;
+}
+button.mini.add { background: var(--accent); color: #06210f; }
+button.mini:disabled { opacity: 0.4; }
+button.danger { color: var(--error); border-color: var(--error); }
+
+.list.tall { max-height: 48vh; }
+.picker { display: flex; flex-direction: column; gap: 10px; }
+.upload {
+  display: block; text-align: center; cursor: pointer;
+  border: 1px dashed var(--border); border-radius: 8px; padding: 12px; color: var(--muted);
+}
+.upload:hover { border-color: var(--accent); color: var(--ink); }

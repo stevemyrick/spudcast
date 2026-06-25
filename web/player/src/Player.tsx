@@ -58,7 +58,7 @@ export function Player() {
         setNp(playing);
         // Brief static burst masks the channel change, then play.
         setTimeout(() => {
-          setStreamSrc(playerApi.streamUrl(playing.item.streamRef));
+          setStreamSrc(playerApi.streamUrlForItem(playing.item));
           setPhase("playing");
         }, 550);
       } catch {

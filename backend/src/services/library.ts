@@ -105,6 +105,29 @@ export function upsertMany(
   return upsertManyTx(items);
 }
 
+/** Insert a locally-uploaded item (bumper/commercial/etc.) and return it. */
+export function insertLocalItem(input: {
+  externalId: string;
+  title: string;
+  type: LibraryItemType;
+  durationMs: number;
+  streamRef: string;
+}): LibraryItem {
+  upsertStmt.run({
+    source: "local",
+    externalId: input.externalId,
+    title: input.title,
+    type: input.type,
+    durationMs: input.durationMs,
+    year: null,
+    genres: "[]",
+    tags: "[]",
+    thumbUrl: null,
+    streamRef: input.streamRef,
+  });
+  return getByExternalId("local", input.externalId)!;
+}
+
 export function count(): number {
   return (db.prepare("SELECT COUNT(*) AS n FROM library_items").get() as { n: number }).n;
 }

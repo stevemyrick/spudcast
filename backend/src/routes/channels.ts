@@ -1,14 +1,17 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import type { Channel, NowPlaying, ScheduledProgram } from "@spudcast/shared";
+import type { Channel, ChannelWithItems, NowPlaying, ScheduledProgram } from "@spudcast/shared";
 import { requireAuth, requireViewer } from "../auth-guards.js";
 import {
   addItems,
   createChannel,
+  deleteChannel,
   getById,
   getItems,
   listChannels,
+  setItems,
   setOnAir,
+  updateChannel,
 } from "../services/channels.js";
 import { getGuide, nowPlaying } from "../services/scheduler.js";
 import { getById as getLibraryItem } from "../services/library.js";
@@ -23,6 +26,18 @@ const createSchema = z.object({
 
 const itemsSchema = z.object({
   libraryItemIds: z.array(z.number().int().positive()).min(1).max(1000),
+});
+
+const setItemsSchema = z.object({
+  libraryItemIds: z.array(z.number().int().positive()).max(1000),
+});
+
+const updateSchema = z.object({
+  name: z.string().min(1).max(120).optional(),
+  number: z.number().int().min(1).max(9999).optional(),
+  strategy: z.enum(["ordered", "shuffle", "dayparts"]).optional(),
+  iconUrl: z.string().max(2048).nullable().optional(),
+  onAir: z.boolean().optional(),
 });
 
 /** Owner or admin may modify a channel. */
@@ -48,6 +63,50 @@ export async function channelRoutes(app: FastifyInstance): Promise<void> {
       const msg = err instanceof Error ? err.message : "Create failed";
       return reply.code(msg.includes("UNIQUE") ? 409 : 400).send({ error: msg });
     }
+  });
+
+  // Full channel + ordered playlist, for the editor.
+  app.get("/api/channels/:id", { preHandler: requireAuth }, async (req, reply): Promise<ChannelWithItems | void> => {
+    const channel = getById(Number((req.params as { id: string }).id));
+    if (!channel) return reply.code(404).send({ error: "Channel not found" });
+    if (!canEdit(channel, req.currentUser!)) return reply.code(403).send({ error: "Not your channel" });
+    return { channel, items: getItems(channel.id) };
+  });
+
+  app.put("/api/channels/:id", { preHandler: requireAuth }, async (req, reply): Promise<Channel | void> => {
+    const channel = getById(Number((req.params as { id: string }).id));
+    if (!channel) return reply.code(404).send({ error: "Channel not found" });
+    if (!canEdit(channel, req.currentUser!)) return reply.code(403).send({ error: "Not your channel" });
+    const parsed = updateSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Invalid update" });
+    try {
+      return updateChannel(channel.id, parsed.data)!;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Update failed";
+      return reply.code(msg.includes("UNIQUE") ? 409 : 400).send({ error: msg });
+    }
+  });
+
+  app.delete("/api/channels/:id", { preHandler: requireAuth }, async (req, reply) => {
+    const channel = getById(Number((req.params as { id: string }).id));
+    if (!channel) return reply.code(404).send({ error: "Channel not found" });
+    if (!canEdit(channel, req.currentUser!)) return reply.code(403).send({ error: "Not your channel" });
+    deleteChannel(channel.id);
+    return { ok: true };
+  });
+
+  // Replace the whole playlist (used for reorder/remove/add from the editor).
+  app.put("/api/channels/:id/items", { preHandler: requireAuth }, async (req, reply) => {
+    const channel = getById(Number((req.params as { id: string }).id));
+    if (!channel) return reply.code(404).send({ error: "Channel not found" });
+    if (!canEdit(channel, req.currentUser!)) return reply.code(403).send({ error: "Not your channel" });
+    const parsed = setItemsSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Invalid items" });
+    for (const id of parsed.data.libraryItemIds) {
+      if (!getLibraryItem(id)) return reply.code(400).send({ error: `Unknown library item ${id}` });
+    }
+    setItems(channel.id, parsed.data.libraryItemIds);
+    return { ok: true, items: getItems(channel.id).length };
   });
 
   app.post("/api/channels/:id/items", { preHandler: requireAuth }, async (req, reply) => {

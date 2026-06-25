@@ -79,6 +79,41 @@ export function setOnAir(id: number, onAir: boolean): void {
   db.prepare("UPDATE channels SET onAir = ? WHERE id = ?").run(onAir ? 1 : 0, id);
 }
 
+export interface UpdateChannelInput {
+  name?: string;
+  number?: number;
+  strategy?: ChannelStrategy;
+  iconUrl?: string | null;
+  onAir?: boolean;
+}
+
+export function updateChannel(id: number, input: UpdateChannelInput): Channel | undefined {
+  const sets: string[] = [];
+  const args: Record<string, unknown> = { id };
+  if (input.name !== undefined) { sets.push("name = @name"); args.name = input.name; }
+  if (input.number !== undefined) { sets.push("number = @number"); args.number = input.number; }
+  if (input.strategy !== undefined) { sets.push("strategy = @strategy"); args.strategy = input.strategy; }
+  if (input.iconUrl !== undefined) { sets.push("iconUrl = @iconUrl"); args.iconUrl = input.iconUrl; }
+  if (input.onAir !== undefined) { sets.push("onAir = @onAir"); args.onAir = input.onAir ? 1 : 0; }
+  if (sets.length) db.prepare(`UPDATE channels SET ${sets.join(", ")} WHERE id = @id`).run(args);
+  return getById(id);
+}
+
+export function deleteChannel(id: number): void {
+  db.prepare("DELETE FROM channels WHERE id = ?").run(id);
+}
+
+/** Replace a channel's playlist with the given ordered list (handles reorder/remove/add). */
+export function setItems(channelId: number, libraryItemIds: number[]): void {
+  const del = db.prepare("DELETE FROM channel_items WHERE channelId = ?");
+  const ins = db.prepare("INSERT INTO channel_items (channelId, libraryItemId, ord) VALUES (?, ?, ?)");
+  const tx = db.transaction(() => {
+    del.run(channelId);
+    libraryItemIds.forEach((itemId, i) => ins.run(channelId, itemId, i));
+  });
+  tx();
+}
+
 /** Append library items to a channel's playlist, preserving order. */
 export function addItems(channelId: number, libraryItemIds: number[]): void {
   const maxOrd =

@@ -148,6 +148,19 @@ export interface AddChannelItemsRequest {
   libraryItemIds: number[];
 }
 
+export interface UpdateChannelRequest {
+  name?: string;
+  number?: number;
+  strategy?: ChannelStrategy;
+  iconUrl?: string | null;
+  onAir?: boolean;
+}
+
+export interface ChannelWithItems {
+  channel: Channel;
+  items: LibraryItem[];
+}
+
 export interface HealthResponse {
   status: "ok";
   version: string;

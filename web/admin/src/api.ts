@@ -1,5 +1,9 @@
 import type {
+  Channel,
+  ChannelWithItems,
   ConnectionTestResult,
+  CreateChannelRequest,
+  LibraryItem,
   LibraryPage,
   LibraryQuery,
   LibrarySyncResult,
@@ -9,6 +13,7 @@ import type {
   SetupRequest,
   SetupStatus,
   SyncStatus,
+  UpdateChannelRequest,
   User,
 } from "@spudcast/shared";
 
@@ -87,4 +92,48 @@ export const api = {
     }),
   deleteUser: (id: number) =>
     jsonFetch<{ ok: boolean }>(`/api/users/${id}`, { method: "DELETE" }),
+
+  // --- Channels ---
+  channels: (all = true) => jsonFetch<Channel[]>(`/api/channels${all ? "?all=true" : ""}`),
+  channel: (id: number) => jsonFetch<ChannelWithItems>(`/api/channels/${id}`),
+  createChannel: (body: CreateChannelRequest) =>
+    jsonFetch<Channel>("/api/channels", { method: "POST", body: JSON.stringify(body) }),
+  updateChannel: (id: number, body: UpdateChannelRequest) =>
+    jsonFetch<Channel>(`/api/channels/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  deleteChannel: (id: number) =>
+    jsonFetch<{ ok: boolean }>(`/api/channels/${id}`, { method: "DELETE" }),
+  setChannelItems: (id: number, libraryItemIds: number[]) =>
+    jsonFetch<{ ok: boolean; items: number }>(`/api/channels/${id}/items`, {
+      method: "PUT",
+      body: JSON.stringify({ libraryItemIds }),
+    }),
+
+  /** Upload a local clip; duration is read in-browser and sent along. */
+  uploadLocal: async (file: File, type: string, durationMs: number, title: string) => {
+    const fd = new FormData();
+    fd.append("type", type);
+    fd.append("durationMs", String(durationMs));
+    fd.append("title", title);
+    fd.append("file", file);
+    const res = await fetch("/api/library/upload", { method: "POST", body: fd, credentials: "same-origin" });
+    if (!res.ok) {
+      const b = await res.json().catch(() => ({}));
+      throw new Error((b as { error?: string }).error ?? `Upload failed: ${res.status}`);
+    }
+    return (await res.json()) as LibraryItem;
+  },
 };
+
+/** Read a video file's duration in the browser (so the backend needs no ffmpeg). */
+export function readDurationMs(file: File): Promise<number> {
+  return new Promise((resolve) => {
+    const v = document.createElement("video");
+    v.preload = "metadata";
+    v.onloadedmetadata = () => {
+      URL.revokeObjectURL(v.src);
+      resolve(Number.isFinite(v.duration) ? Math.round(v.duration * 1000) : 0);
+    };
+    v.onerror = () => resolve(0);
+    v.src = URL.createObjectURL(file);
+  });
+}

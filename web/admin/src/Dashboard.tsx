@@ -5,12 +5,13 @@ import { LibraryView } from "./LibraryView.js";
 import { SettingsView } from "./SettingsView.js";
 import { DevicesView } from "./DevicesView.js";
 import { UsersView } from "./UsersView.js";
+import { ChannelsView } from "./ChannelsView.js";
 
-type Tab = "library" | "devices" | "users" | "settings";
+type Tab = "channels" | "library" | "devices" | "users" | "settings";
 
 /** Home shell once setup + login are complete. Channel building lands in M3. */
 export function Dashboard({ session, onLogout }: { session: SessionInfo; onLogout: () => void }) {
-  const [tab, setTab] = useState<Tab>("library");
+  const [tab, setTab] = useState<Tab>("channels");
   const isAdmin = session.user?.role === "admin";
 
   async function logout() {
@@ -23,6 +24,7 @@ export function Dashboard({ session, onLogout }: { session: SessionInfo; onLogou
       <header className="topbar">
         <span className="logo small">spudcast</span>
         <nav className="tabs">
+          <button className={tab === "channels" ? "tab active" : "tab"} onClick={() => setTab("channels")}>Channels</button>
           <button className={tab === "library" ? "tab active" : "tab"} onClick={() => setTab("library")}>Library</button>
           {isAdmin && (
             <button className={tab === "devices" ? "tab active" : "tab"} onClick={() => setTab("devices")}>Devices</button>
@@ -39,6 +41,7 @@ export function Dashboard({ session, onLogout }: { session: SessionInfo; onLogou
         <button className="ghost" onClick={logout}>Sign out</button>
       </header>
       <main className="content">
+        {tab === "channels" && <ChannelsView session={session} />}
         {tab === "library" && <LibraryView />}
         {tab === "devices" && isAdmin && <DevicesView />}
         {tab === "users" && isAdmin && <UsersView session={session} />}
