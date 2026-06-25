@@ -1,7 +1,14 @@
 import type {
+  ConnectionTestResult,
+  LibraryPage,
+  LibraryQuery,
+  LibrarySyncResult,
   SessionInfo,
+  SettingsUpdate,
+  SettingsView,
   SetupRequest,
   SetupStatus,
+  SyncStatus,
   User,
 } from "@spudcast/shared";
 
@@ -32,4 +39,29 @@ export const api = {
       body: JSON.stringify({ username, password }),
     }),
   logout: () => jsonFetch<SessionInfo>("/api/auth/logout", { method: "POST" }),
+
+  // --- Library ---
+  library: (q: LibraryQuery = {}) => {
+    const params = new URLSearchParams();
+    if (q.type) params.set("type", q.type);
+    if (q.genre) params.set("genre", q.genre);
+    if (q.search) params.set("search", q.search);
+    if (q.limit != null) params.set("limit", String(q.limit));
+    if (q.offset != null) params.set("offset", String(q.offset));
+    const qs = params.toString();
+    return jsonFetch<LibraryPage>(`/api/library${qs ? `?${qs}` : ""}`);
+  },
+  syncStatus: () => jsonFetch<SyncStatus>("/api/library/sync-status"),
+  refreshLibrary: () =>
+    jsonFetch<LibrarySyncResult>("/api/library/refresh", { method: "POST" }),
+
+  // --- Settings ---
+  getSettings: () => jsonFetch<SettingsView>("/api/settings"),
+  updateSettings: (body: SettingsUpdate) =>
+    jsonFetch<SettingsView>("/api/settings", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  testJellyfin: () =>
+    jsonFetch<ConnectionTestResult>("/api/settings/jellyfin/test", { method: "POST" }),
 };

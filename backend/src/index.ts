@@ -9,6 +9,10 @@ import { resolveCookieSecret } from "./session.js";
 import { healthRoutes } from "./routes/health.js";
 import { setupRoutes } from "./routes/setup.js";
 import { authRoutes } from "./routes/auth.js";
+import { libraryRoutes } from "./routes/library.js";
+import { settingsRoutes } from "./routes/settings.js";
+import { artRoutes } from "./routes/art.js";
+import { startSyncSchedule } from "./services/syncSchedule.js";
 
 async function main(): Promise<void> {
   ensureDataDirs();
@@ -28,6 +32,9 @@ async function main(): Promise<void> {
   await app.register(healthRoutes);
   await app.register(setupRoutes);
   await app.register(authRoutes);
+  await app.register(libraryRoutes);
+  await app.register(settingsRoutes);
+  await app.register(artRoutes);
 
   // Serve the built frontends in production: admin at /, player at /tv.
   const adminDir = join(config.webDir, "admin");
@@ -46,6 +53,12 @@ async function main(): Promise<void> {
       return reply.sendFile("index.html", adminDir);
     });
   }
+
+  // Daily library sync ticker — the only background Jellyfin traffic.
+  startSyncSchedule({
+    info: (msg) => app.log.info(msg),
+    error: (msg) => app.log.error(msg),
+  });
 
   await app.listen({ port: config.port, host: config.host });
   app.log.info(`spudcast backend listening on http://${config.host}:${config.port}`);

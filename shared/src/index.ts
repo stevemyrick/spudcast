@@ -134,3 +134,68 @@ export interface HealthResponse {
   version: string;
   uptimeSec: number;
 }
+
+// ---------------------------------------------------------------------------
+// Library sync & queries
+// ---------------------------------------------------------------------------
+
+export interface LibrarySyncResult {
+  added: number;
+  updated: number;
+  total: number;
+  startedAt: string;
+  finishedAt: string;
+  /** True when an incremental sync (only items changed since lastSyncAt). */
+  incremental: boolean;
+}
+
+export interface SyncStatus {
+  lastSyncAt: string | null;
+  itemCount: number;
+  running: boolean;
+}
+
+export interface LibraryQuery {
+  type?: LibraryItemType;
+  genre?: string;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface LibraryPage {
+  items: LibraryItem[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+/**
+ * Settings as shown to the admin UI: secrets are never returned, only whether
+ * they are present. Non-secret fields are returned as-is.
+ */
+export interface SettingsView {
+  jellyfinBaseUrl: string;
+  hasJellyfinKey: boolean;
+  hasTmdbKey: boolean;
+  hasOmdbKey: boolean;
+  hasYoutubeKey: boolean;
+  dailySyncTime: string;
+  lastSyncAt: string | null;
+}
+
+/** Partial update from the admin. Empty/omitted secret fields leave them unchanged. */
+export interface SettingsUpdate {
+  jellyfinBaseUrl?: string;
+  jellyfinApiKey?: string;
+  tmdbApiKey?: string;
+  omdbApiKey?: string;
+  youtubeApiKey?: string;
+  dailySyncTime?: string;
+}
+
+export interface ConnectionTestResult {
+  ok: boolean;
+  /** Server name / version on success, or an error message on failure. */
+  detail: string;
+}

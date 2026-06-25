@@ -1,4 +1,9 @@
-import type { JellyfinSettings, Settings } from "@spudcast/shared";
+import type {
+  JellyfinSettings,
+  Settings,
+  SettingsUpdate,
+  SettingsView,
+} from "@spudcast/shared";
 import { db } from "../db.js";
 
 const getStmt = db.prepare<[string], { value: string }>(
@@ -45,4 +50,36 @@ export function hasJellyfinConfigured(): boolean {
 
 export function setLastSyncAt(iso: string): void {
   setRaw("sync.lastAt", iso);
+}
+
+/** Redacted view for the admin UI — secrets become presence booleans. */
+export function getSettingsView(): SettingsView {
+  return {
+    jellyfinBaseUrl: getRaw("jellyfin.baseUrl") ?? "",
+    hasJellyfinKey: Boolean(getRaw("jellyfin.apiKey")),
+    hasTmdbKey: Boolean(getRaw("tmdb.apiKey")),
+    hasOmdbKey: Boolean(getRaw("omdb.apiKey")),
+    hasYoutubeKey: Boolean(getRaw("youtube.apiKey")),
+    dailySyncTime: getRaw("sync.dailyTime") ?? DEFAULT_SYNC_TIME,
+    lastSyncAt: getRaw("sync.lastAt") ?? null,
+  };
+}
+
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** Apply a partial settings update. Omitted/empty secret fields are left as-is. */
+export function applySettingsUpdate(update: SettingsUpdate): void {
+  if (update.jellyfinBaseUrl !== undefined) {
+    setRaw("jellyfin.baseUrl", update.jellyfinBaseUrl.replace(/\/+$/, ""));
+  }
+  if (update.jellyfinApiKey) setRaw("jellyfin.apiKey", update.jellyfinApiKey);
+  if (update.tmdbApiKey) setRaw("tmdb.apiKey", update.tmdbApiKey);
+  if (update.omdbApiKey) setRaw("omdb.apiKey", update.omdbApiKey);
+  if (update.youtubeApiKey) setRaw("youtube.apiKey", update.youtubeApiKey);
+  if (update.dailySyncTime !== undefined) {
+    if (!TIME_RE.test(update.dailySyncTime)) {
+      throw new Error("dailySyncTime must be HH:mm (24-hour)");
+    }
+    setRaw("sync.dailyTime", update.dailySyncTime);
+  }
 }

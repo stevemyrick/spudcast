@@ -1,8 +1,16 @@
+import { useState } from "react";
 import type { SessionInfo } from "@spudcast/shared";
 import { api } from "./api.js";
+import { LibraryView } from "./LibraryView.js";
+import { SettingsView } from "./SettingsView.js";
 
-/** Placeholder home once setup + login are complete. Channels UI lands in M3. */
+type Tab = "library" | "settings";
+
+/** Home shell once setup + login are complete. Channel building lands in M3. */
 export function Dashboard({ session, onLogout }: { session: SessionInfo; onLogout: () => void }) {
+  const [tab, setTab] = useState<Tab>("library");
+  const isAdmin = session.user?.role === "admin";
+
   async function logout() {
     await api.logout();
     onLogout();
@@ -12,21 +20,19 @@ export function Dashboard({ session, onLogout }: { session: SessionInfo; onLogou
     <div className="shell">
       <header className="topbar">
         <span className="logo small">spudcast</span>
+        <nav className="tabs">
+          <button className={tab === "library" ? "tab active" : "tab"} onClick={() => setTab("library")}>Library</button>
+          {isAdmin && (
+            <button className={tab === "settings" ? "tab active" : "tab"} onClick={() => setTab("settings")}>Settings</button>
+          )}
+        </nav>
         <span className="spacer" />
-        <span className="muted">{session.user?.username} ({session.user?.role})</span>
+        <span className="muted small">{session.user?.username} ({session.user?.role})</span>
         <button className="ghost" onClick={logout}>Sign out</button>
       </header>
-      <main className="center">
-        <div className="card">
-          <h2>Station ready 📺</h2>
-          <p className="muted">
-            Setup complete. Channel creation, the library browser, and auto-generated
-            channels arrive in the next milestones.
-          </p>
-          <p className="muted">
-            Open the TV at <code>/tv</code> on your kiosk device.
-          </p>
-        </div>
+      <main className="content">
+        {tab === "library" && <LibraryView />}
+        {tab === "settings" && isAdmin && <SettingsView />}
       </main>
     </div>
   );
