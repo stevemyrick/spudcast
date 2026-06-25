@@ -1,0 +1,19 @@
+services:
+  spudcast:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: spudcast:latest
+    container_name: spudcast
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      # Persist the SQLite db, artwork cache and uploads. On a Synology, point
+      # this at a folder on the SSD/system volume so it doesn't keep the media
+      # disks awake.
+      - ./data:/data
+    environment:
+      - NODE_ENV=production
+      # Optional: pin a cookie secret instead of the auto-generated one.
+      # - SPUDCAST_COOKIE_SECRET=change-me
