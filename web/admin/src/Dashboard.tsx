@@ -4,8 +4,9 @@ import { api } from "./api.js";
 import { LibraryView } from "./LibraryView.js";
 import { SettingsView } from "./SettingsView.js";
 import { DevicesView } from "./DevicesView.js";
+import { UsersView } from "./UsersView.js";
 
-type Tab = "library" | "devices" | "settings";
+type Tab = "library" | "devices" | "users" | "settings";
 
 /** Home shell once setup + login are complete. Channel building lands in M3. */
 export function Dashboard({ session, onLogout }: { session: SessionInfo; onLogout: () => void }) {
@@ -27,6 +28,9 @@ export function Dashboard({ session, onLogout }: { session: SessionInfo; onLogou
             <button className={tab === "devices" ? "tab active" : "tab"} onClick={() => setTab("devices")}>Devices</button>
           )}
           {isAdmin && (
+            <button className={tab === "users" ? "tab active" : "tab"} onClick={() => setTab("users")}>Users</button>
+          )}
+          {isAdmin && (
             <button className={tab === "settings" ? "tab active" : "tab"} onClick={() => setTab("settings")}>Settings</button>
           )}
         </nav>
@@ -37,6 +41,7 @@ export function Dashboard({ session, onLogout }: { session: SessionInfo; onLogou
       <main className="content">
         {tab === "library" && <LibraryView />}
         {tab === "devices" && isAdmin && <DevicesView />}
+        {tab === "users" && isAdmin && <UsersView session={session} />}
         {tab === "settings" && isAdmin && <SettingsView />}
       </main>
     </div>

@@ -77,4 +77,14 @@ export const api = {
     }),
   revokeDevice: (id: number) =>
     jsonFetch<{ ok: boolean }>(`/api/devices/${id}`, { method: "DELETE" }),
+
+  // --- Users (admin) ---
+  listUsers: () => jsonFetch<User[]>("/api/users"),
+  createUser: (username: string, password: string, role: "admin" | "user") =>
+    jsonFetch<User>("/api/users", {
+      method: "POST",
+      body: JSON.stringify({ username, password, role }),
+    }),
+  deleteUser: (id: number) =>
+    jsonFetch<{ ok: boolean }>(`/api/users/${id}`, { method: "DELETE" }),
 };

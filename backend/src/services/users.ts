@@ -38,6 +38,37 @@ export function hasAdmin(): boolean {
   return userCount() > 0;
 }
 
+const adminCountStmt = db.prepare<[], { n: number }>(
+  "SELECT COUNT(*) AS n FROM users WHERE role = 'admin'",
+);
+const listStmt = db.prepare<[], UserRow>("SELECT * FROM users ORDER BY id");
+const deleteStmt = db.prepare<[number]>("DELETE FROM users WHERE id = ?");
+
+export function listUsers(): User[] {
+  return listStmt.all().map(toUser);
+}
+
+export function adminCount(): number {
+  return adminCountStmt.get()!.n;
+}
+
+/**
+ * Delete a user. Refuses to remove the last remaining admin so the station
+ * can't be locked out. (Their channels cascade-delete via the FK.)
+ */
+export function deleteUser(id: number): void {
+  const target = getUserById(id);
+  if (!target) return;
+  if (target.role === "admin" && adminCount() <= 1) {
+    throw new Error("Cannot delete the last admin");
+  }
+  deleteStmt.run(id);
+}
+
+export function usernameExists(username: string): boolean {
+  return Boolean(byNameStmt.get(username));
+}
+
 export async function createUser(
   username: string,
   password: string,

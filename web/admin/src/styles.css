@@ -61,6 +61,15 @@ input {
 }
 input:focus { outline: 2px solid var(--accent); border-color: transparent; }
 
+select {
+  background: #0c1322;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--ink);
+  font-size: 0.95rem;
+}
+
 button {
   margin-top: 10px;
   background: var(--accent);
