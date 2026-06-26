@@ -96,6 +96,15 @@ describe("channel authorization (IDOR)", () => {
     expect((await app.inject({ method: "GET", url: "/api/now-playing/1" })).statusCode).toBe(401);
     expect((await app.inject({ method: "GET", url: "/api/channels" })).statusCode).toBe(401);
   });
+
+  it("art proxy 404s (not 500s) when Jellyfin is unreachable", async () => {
+    const cookie = await setupAdmin(app); // baseUrl points at an unreachable host
+    const res = await inj(app, cookie, {
+      method: "GET",
+      url: "/api/art/jellyfin/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    });
+    expect(res.statusCode).toBe(404);
+  });
 });
 
 describe("IPTV export", () => {

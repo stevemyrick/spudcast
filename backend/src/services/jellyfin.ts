@@ -122,10 +122,15 @@ export function imageUrl(itemId: string, maxWidth = 400): string {
 export async function fetchImage(
   itemId: string,
 ): Promise<{ body: ArrayBuffer; contentType: string } | null> {
-  const res = await fetch(imageUrl(itemId), { signal: AbortSignal.timeout(15000) });
-  if (!res.ok) return null;
-  return {
-    body: await res.arrayBuffer(),
-    contentType: res.headers.get("content-type") ?? "image/jpeg",
-  };
+  // Unreachable/unconfigured Jellyfin → null (art route 404s, never 500s).
+  try {
+    const res = await fetch(imageUrl(itemId), { signal: AbortSignal.timeout(15000) });
+    if (!res.ok) return null;
+    return {
+      body: await res.arrayBuffer(),
+      contentType: res.headers.get("content-type") ?? "image/jpeg",
+    };
+  } catch {
+    return null;
+  }
 }

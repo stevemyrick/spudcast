@@ -183,7 +183,10 @@ export function queryByRules(rules: AutoRules): LibraryItem[] {
   }
 
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
-  const limit = Math.min(Math.max(rules.limit ?? 500, 1), 2000);
+  // Coerce to a safe integer — this value is interpolated into the SQL, and the
+  // preview endpoint accepts unvalidated rules (a non-numeric limit must not
+  // become "LIMIT NaN").
+  const limit = Math.min(Math.max(Math.floor(Number(rules.limit)) || 500, 1), 2000);
   const rows = db
     .prepare(`SELECT * FROM library_items ${whereSql} ORDER BY id LIMIT ${limit}`)
     .all(args) as LibraryRow[];

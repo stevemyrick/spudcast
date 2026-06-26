@@ -60,4 +60,11 @@ describe("auto-channel rules", () => {
     for (let i = 0; i < 5; i++) seedItem({ title: `M${i}`, type: "movie", year: 1990 });
     expect(queryByRules({ limit: 3 })).toHaveLength(3);
   });
+
+  it("survives a non-numeric limit (no 'LIMIT NaN' SQL error)", () => {
+    for (let i = 0; i < 3; i++) seedItem({ title: `M${i}` });
+    // The preview endpoint forwards unvalidated rules.
+    expect(() => queryByRules({ limit: "abc" as unknown as number })).not.toThrow();
+    expect(queryByRules({ limit: "abc" as unknown as number })).toHaveLength(3);
+  });
 });
