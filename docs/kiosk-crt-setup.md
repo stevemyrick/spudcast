@@ -123,6 +123,23 @@ timedatectl status      # check "System clock synchronized: yes"
 | `A` | Cycle aspect ratio (contain / cover / fill) |
 | `I` | Flash the channel bug |
 
+## The weather channel
+
+spudcast can run an always-live **weather channel** — a retro WeatherStar 4000+
+display with your own background music.
+
+- In the admin: **Channels → 🌤 Weather**. Set a channel number/name, a **WeatherStar
+  URL**, and the **background audio**.
+- The URL defaults to the public hosted ws4kp instance
+  (`https://weatherstar.netbymatt.com`). Open it once in a browser and set your
+  location there. For full control/offline use, **self-host ws4kp** (it's MIT-licensed,
+  Docker-friendly) and point spudcast at your instance, e.g. `http://<nas-ip>:8081`.
+- **Background audio:** *None*, a **YouTube URL** (lofi/jazz — best-effort, browser
+  autoplay rules apply), or a **Jellyfin audio item id** (streamed through spudcast's
+  proxy so your key stays server-side). Mute from the player/remote stops the Jellyfin
+  bed.
+- It joins instantly (no program loop) and shows as "Weather" in the channel bug.
+
 ## Troubleshooting
 
 - **Black screen, no video:** confirm `--autoplay-policy=no-user-gesture-required`;

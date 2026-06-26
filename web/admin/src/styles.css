@@ -167,3 +167,6 @@ button.danger { color: var(--error); border-color: var(--error); }
   background: #0c1322; border: 1px solid var(--border); border-radius: 8px; }
 .check { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .check input { width: auto; margin: 0; }
+.stack { display: flex; flex-direction: column; gap: 14px; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field > span.small { color: var(--muted); }

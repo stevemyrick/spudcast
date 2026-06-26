@@ -1,4 +1,4 @@
-import type { Channel, LibraryItem, NowPlaying } from "@spudcast/shared";
+import type { Channel, ChannelConfig, LibraryItem, NowPlaying } from "@spudcast/shared";
 import { getByNumber, resolveChannelItems } from "./channels.js";
 
 /**
@@ -61,11 +61,19 @@ export function nowPlaying(channelNumber: number): NowPlaying | null {
 }
 
 export function nowPlayingForChannel(channel: Channel): NowPlaying | null {
+  // The weather channel is always live — no program loop.
+  if (channel.type === "weather") {
+    const weather = (channel.config as ChannelConfig | null)?.weather;
+    if (!weather?.embedUrl) return null;
+    return { kind: "weather", channel, weather };
+  }
+
   const state = loopState(channel, Date.now());
   if (!state) return null;
   const item = state.items[state.index];
   const endMs = state.currentStartMs + safeDuration(item);
   return {
+    kind: "program",
     channel,
     item,
     offsetMs: state.offsetMs,

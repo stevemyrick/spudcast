@@ -53,6 +53,10 @@ export const playerApi = {
   },
   artUrl: (path: string) =>
     `${path}?token=${encodeURIComponent(getToken() ?? "")}`,
+
+  /** Proxied Jellyfin audio URL (weather-channel background music). */
+  audioUrl: (jellyfinId: string) =>
+    `/api/stream/jellyfin-audio/${jellyfinId}?token=${encodeURIComponent(getToken() ?? "")}`,
 };
 
 /** WebSocket URL for the remote-control channel (same origin). */

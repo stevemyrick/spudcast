@@ -33,6 +33,17 @@ const configSchema = z.object({
       perBreak: z.number().int().min(0).max(10),
     })
     .optional(),
+  weather: z
+    .object({
+      embedUrl: z.string().url().max(2048),
+      audio: z
+        .object({
+          kind: z.enum(["none", "youtube", "jellyfin"]),
+          value: z.string().max(2048).optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 const createSchema = z.object({

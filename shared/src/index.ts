@@ -119,8 +119,9 @@ export interface ProgramEntry {
   isFiller: boolean;
 }
 
-/** The player's answer to "what's on channel N right now?" */
-export interface NowPlaying {
+/** A normal scheduled program playing on a channel. */
+export interface ProgramNowPlaying {
+  kind: "program";
   channel: Channel;
   item: LibraryItem;
   /** Offset into the item, in ms, where the player should join. */
@@ -128,6 +129,16 @@ export interface NowPlaying {
   /** When the current item ends (ISO), so the player can schedule the next fetch. */
   endsAt: string;
 }
+
+/** The always-live weather channel: the player renders ws4kp + background audio. */
+export interface WeatherNowPlaying {
+  kind: "weather";
+  channel: Channel;
+  weather: WeatherConfig;
+}
+
+/** The player's answer to "what's on channel N right now?" */
+export type NowPlaying = ProgramNowPlaying | WeatherNowPlaying;
 
 /** A program slot in the on-screen guide. */
 export interface ScheduledProgram {
@@ -155,9 +166,24 @@ export interface FillerConfig {
   perBreak: number;
 }
 
-/** Free-form per-channel config (filler now; weather location/audio later). */
+/** Background audio for the weather channel: none, a YouTube URL, or a Jellyfin track. */
+export interface WeatherAudio {
+  kind: "none" | "youtube" | "jellyfin";
+  /** YouTube watch/share URL, or a Jellyfin audio item id, depending on `kind`. */
+  value?: string;
+}
+
+/** Weather-channel settings: the WeatherStar (ws4kp) page to embed + audio bed. */
+export interface WeatherConfig {
+  /** Full URL of a WeatherStar 4000+ instance (public or self-hosted), location-configured. */
+  embedUrl: string;
+  audio?: WeatherAudio;
+}
+
+/** Free-form per-channel config (commercial filler + weather settings). */
 export interface ChannelConfig {
   filler?: FillerConfig;
+  weather?: WeatherConfig;
 }
 
 export interface CreateChannelRequest {

@@ -4,7 +4,7 @@ import { basename, extname, join } from "node:path";
 import { Readable } from "node:stream";
 import type { FastifyInstance } from "fastify";
 import { requireViewer } from "../auth-guards.js";
-import { buildStreamUrl } from "../services/jellyfin.js";
+import { buildAudioStreamUrl, buildStreamUrl } from "../services/jellyfin.js";
 import { getById as getLibraryItem } from "../services/library.js";
 import { uploadsDir } from "../config.js";
 
@@ -37,6 +37,26 @@ export async function streamRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(upstream.status === 404 ? 404 : 502).send({ error: "Upstream stream error" });
     }
 
+    reply.code(upstream.status);
+    for (const h of PASS_HEADERS) {
+      const v = upstream.headers.get(h);
+      if (v) reply.header(h, v);
+    }
+    if (!upstream.body) return reply.send();
+    return reply.send(Readable.fromWeb(upstream.body as Parameters<typeof Readable.fromWeb>[0]));
+  });
+
+  // Proxy a Jellyfin audio stream (weather-channel background music). Key hidden.
+  app.get("/api/stream/jellyfin-audio/:id", { preHandler: requireViewer }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    if (!ID_RE.test(id)) return reply.code(400).send({ error: "Invalid id" });
+
+    const headers: Record<string, string> = {};
+    if (req.headers.range) headers.range = req.headers.range;
+    const upstream = await fetch(buildAudioStreamUrl(id), { headers });
+    if (!upstream.ok && upstream.status !== 206) {
+      return reply.code(upstream.status === 404 ? 404 : 502).send({ error: "Upstream audio error" });
+    }
     reply.code(upstream.status);
     for (const h of PASS_HEADERS) {
       const v = upstream.headers.get(h);

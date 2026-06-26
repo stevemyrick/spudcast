@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Channel, ControlServerMessage, NowPlaying, RemoteCommand } from "@spudcast/shared";
+import type {
+  Channel,
+  ControlServerMessage,
+  NowPlaying,
+  RemoteCommand,
+  WeatherConfig,
+} from "@spudcast/shared";
 import { controlSocketUrl, getToken, playerApi } from "./api.js";
 import { Guide } from "./Guide.js";
+import { WeatherView } from "./WeatherView.js";
 
-type Phase = "loading" | "static" | "playing" | "standby";
+type Phase = "loading" | "static" | "playing" | "standby" | "weather";
 type AspectMode = "contain" | "cover" | "fill";
 
 const LAST_CHANNEL_KEY = "spud_last_channel";
@@ -12,6 +19,7 @@ export function Player() {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [index, setIndex] = useState(0);
   const [np, setNp] = useState<NowPlaying | null>(null);
+  const [weather, setWeather] = useState<WeatherConfig | null>(null);
   const [streamSrc, setStreamSrc] = useState<string | undefined>(undefined);
   const [phase, setPhase] = useState<Phase>("loading");
   const [bugVisible, setBugVisible] = useState(false);
@@ -57,13 +65,21 @@ export function Player() {
       try {
         const playing = await playerApi.nowPlaying(channel.number);
         setNp(playing);
-        // Brief static burst masks the channel change, then play.
+        // Brief static burst masks the channel change, then show the content.
         setTimeout(() => {
-          setStreamSrc(playerApi.streamUrlForItem(playing.item));
-          setPhase("playing");
+          if (playing.kind === "weather") {
+            setWeather(playing.weather);
+            setStreamSrc(undefined);
+            setPhase("weather");
+          } else {
+            setWeather(null);
+            setStreamSrc(playerApi.streamUrlForItem(playing.item));
+            setPhase("playing");
+          }
         }, 550);
       } catch {
         setNp(null);
+        setWeather(null);
         setPhase("standby");
       }
     },
@@ -78,7 +94,7 @@ export function Player() {
   // Seek to the live offset once the media is ready.
   function onLoadedMetadata() {
     const v = videoRef.current;
-    if (v && np) {
+    if (v && np && np.kind === "program") {
       const target = np.offsetMs / 1000;
       if (target > 0 && target < (v.duration || Infinity)) v.currentTime = target;
       v.play().catch(() => undefined);
@@ -208,6 +224,8 @@ export function Player() {
         onError={onError}
       />
 
+      {phase === "weather" && weather && <WeatherView config={weather} muted={muted} />}
+
       {phase === "static" && <div className="static loud" aria-hidden />}
 
       {(phase === "standby" || phase === "loading") && (
@@ -228,7 +246,9 @@ export function Player() {
         <div className="bug">
           <span className="ch-num">CH {current.number}</span>
           <span className="ch-name">{current.name}</span>
-          {np && <span className="ch-title">{np.item.title}</span>}
+          {np && (
+            <span className="ch-title">{np.kind === "weather" ? "Weather" : np.item.title}</span>
+          )}
         </div>
       )}
 

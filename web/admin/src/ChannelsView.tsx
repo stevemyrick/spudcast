@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Channel, LibraryItem, SessionInfo } from "@spudcast/shared";
+import type { WeatherConfig } from "@spudcast/shared";
 import { api, readDurationMs } from "./api.js";
 import { AutoChannelWizard } from "./AutoChannelWizard.js";
+import { WeatherChannelWizard, WeatherFields } from "./WeatherChannel.js";
 
 function fmtDur(ms: number): string {
   const m = Math.round(ms / 60000);
@@ -15,6 +17,7 @@ export function ChannelsView({ session }: { session: SessionInfo }) {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [wizard, setWizard] = useState(false);
+  const [weatherWizard, setWeatherWizard] = useState(false);
   const [newNumber, setNewNumber] = useState("");
   const [newName, setNewName] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
@@ -66,11 +69,24 @@ export function ChannelsView({ session }: { session: SessionInfo }) {
     );
   }
 
+  if (weatherWizard) {
+    return (
+      <WeatherChannelWizard
+        onCancel={() => setWeatherWizard(false)}
+        onCreated={() => {
+          setWeatherWizard(false);
+          loadChannels();
+        }}
+      />
+    );
+  }
+
   return (
     <div className="panel">
       <div className="row">
         <h2 style={{ margin: 0 }}>Channels</h2>
         <span className="spacer" />
+        <button className="ghost" onClick={() => setWeatherWizard(true)}>🌤 Weather</button>
         <button className="ghost" onClick={() => setWizard(true)}>✨ Auto channel</button>
       </div>
       <form className="row" onSubmit={create}>
@@ -85,7 +101,7 @@ export function ChannelsView({ session }: { session: SessionInfo }) {
           <div className="list-item" key={c.id}>
             <span className="ch-pill">{c.number}</span>
             <span className="title">{c.name}</span>
-            {c.type === "auto" && <span className="badge">auto</span>}
+            {c.type !== "manual" && <span className="badge">{c.type}</span>}
             {c.onAir ? <span className="badge on">ON AIR</span> : <span className="badge">off air</span>}
             <span className="spacer" />
             <button className="ghost" onClick={() => setEditingId(c.id)}>Edit</button>
@@ -163,6 +179,12 @@ function ChannelEditor({ channelId, onBack }: { channelId: number; onBack: () =>
 
   const totalMs = items.reduce((s, it) => s + it.durationMs, 0);
   const isAuto = channel.type === "auto";
+  const isWeather = channel.type === "weather";
+
+  async function saveWeather(weather: WeatherConfig) {
+    const updated = await api.updateChannel(channel!.id, { config: { weather } });
+    setChannel(updated);
+  }
 
   return (
     <div className="panel wide">
@@ -170,16 +192,18 @@ function ChannelEditor({ channelId, onBack }: { channelId: number; onBack: () =>
         <button className="ghost" onClick={onBack}>← Channels</button>
         <span className="ch-pill">{channel.number}</span>
         <input value={channel.name} onChange={(e) => setChannel({ ...channel, name: e.target.value })} onBlur={(e) => rename(e.target.value)} className="grow" />
-        {isAuto && <span className="badge">auto</span>}
+        {channel.type !== "manual" && <span className="badge">{channel.type}</span>}
         <button className={channel.onAir ? "" : "ghost"} onClick={toggleOnAir}>
           {channel.onAir ? "On air" : "Off air"}
         </button>
         <button className="ghost danger" onClick={del}>Delete</button>
       </div>
 
-      <FillerControls channel={channel} onChange={setChannel} />
+      {!isWeather && <FillerControls channel={channel} onChange={setChannel} />}
 
-      {isAuto ? (
+      {isWeather ? (
+        <WeatherEditor channel={channel} onSave={saveWeather} />
+      ) : isAuto ? (
         <div>
           <h3>Auto lineup · {items.length} programs · {fmtDur(totalMs)} loop</h3>
           <p className="muted small">
@@ -225,6 +249,32 @@ function ChannelEditor({ channelId, onBack }: { channelId: number; onBack: () =>
           <LibraryPicker onAdd={add} onUploaded={add} />
         </div>
       )}
+    </div>
+  );
+}
+
+/** Edit a weather channel's WeatherStar URL + background audio. */
+function WeatherEditor({ channel, onSave }: { channel: Channel; onSave: (c: WeatherConfig) => Promise<void> }) {
+  const initial = ((channel.config as { weather?: WeatherConfig } | null)?.weather) ?? {
+    embedUrl: "https://weatherstar.netbymatt.com",
+    audio: { kind: "none" as const },
+  };
+  const [config, setConfig] = useState<WeatherConfig>(initial);
+  const [saved, setSaved] = useState(false);
+
+  async function save() {
+    await onSave(config);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }
+
+  return (
+    <div className="stack">
+      <p className="muted small">Always-live weather channel. ws4kp visuals with your own audio bed.</p>
+      <WeatherFields value={config} onChange={(c) => { setConfig(c); setSaved(false); }} />
+      <div className="row">
+        <button onClick={save} disabled={!config.embedUrl}>{saved ? "Saved" : "Save weather settings"}</button>
+      </div>
     </div>
   );
 }

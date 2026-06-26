@@ -49,6 +49,11 @@ body {
   100% { transform: translateY(-2px); }
 }
 
+/* Weather channel */
+.weather { position: absolute; inset: 0; z-index: 4; background: #000; }
+.weather-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.weather-audio { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; left: -10px; }
+
 .screen { text-align: center; z-index: 2; }
 .slate { display: grid; place-items: center; gap: 8px; }
 

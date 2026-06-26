@@ -105,6 +105,12 @@ export function buildStreamUrl(itemId: string, opts: StreamUrlOptions = {}): str
   return `${baseUrl}/Videos/${itemId}/stream?static=true&api_key=${encodeURIComponent(apiKey)}`;
 }
 
+/** Build a Jellyfin audio stream URL (for the weather channel's background music). */
+export function buildAudioStreamUrl(itemId: string): string {
+  const { baseUrl, apiKey } = baseUrlOrThrow();
+  return `${baseUrl}/Audio/${itemId}/universal?api_key=${encodeURIComponent(apiKey)}`;
+}
+
 /** Build the primary-image URL for an item (used by the artwork proxy). */
 export function imageUrl(itemId: string, maxWidth = 400): string {
   const { baseUrl, apiKey } = baseUrlOrThrow();
