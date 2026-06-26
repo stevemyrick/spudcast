@@ -91,7 +91,16 @@ export function ChannelsView({ session }: { session: SessionInfo }) {
             <button className="ghost" onClick={() => setEditingId(c.id)}>Edit</button>
           </div>
         ))}
-        {channels.length === 0 && <p className="muted">No channels yet. Create one above.</p>}
+        {channels.length === 0 && (
+          <div className="empty-hint">
+            <p className="muted">No channels yet. Getting started:</p>
+            <ol className="muted small">
+              <li><b>Library</b> → connect Jellyfin in Settings, then <b>Refresh library</b>.</li>
+              <li>Create a channel above, or <b>✨ Auto channel</b> by genre/decade.</li>
+              <li>Toggle it <b>On air</b>, then open <code>/tv</code> on your TV and pair it.</li>
+            </ol>
+          </div>
+        )}
       </div>
     </div>
   );

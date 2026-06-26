@@ -26,7 +26,12 @@ ENV NODE_ENV=production
 ENV SPUDCAST_DATA_DIR=/data
 ENV SPUDCAST_WEB_DIR=/app/public
 ENV PORT=8080
-RUN corepack enable
+ENV TZ=UTC
+# tzdata so the scheduled daily sync honors the container's TZ; corepack for pnpm.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends tzdata \
+  && rm -rf /var/lib/apt/lists/* \
+  && corepack enable
 
 # App source + dependencies (native modules already compiled in the builder).
 COPY --from=builder /app/node_modules ./node_modules

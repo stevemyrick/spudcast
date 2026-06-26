@@ -6,14 +6,21 @@ services:
     image: spudcast:latest
     container_name: spudcast
     restart: unless-stopped
+    # Clean PID 1 signal handling so restarts/stops are graceful.
+    init: true
     ports:
       - "8080:8080"
     volumes:
       # Persist the SQLite db, artwork cache and uploads. On a Synology, point
       # this at a folder on the SSD/system volume so it doesn't keep the media
-      # disks awake.
+      # disks awake. (See docs/synology-deploy.md.)
       - ./data:/data
     environment:
       - NODE_ENV=production
-      # Optional: pin a cookie secret instead of the auto-generated one.
-      # - SPUDCAST_COOKIE_SECRET=change-me
+      # Timezone for the *scheduled daily library sync* (it matches your local
+      # HH:mm). The mid-program "join live" math is UTC-based and unaffected.
+      - TZ=${TZ:-UTC}
+      # Pin a cookie secret so sessions survive redeploys. Generate one with:
+      #   openssl rand -hex 32
+      # If unset, spudcast generates and persists one under /data on first run.
+      # - SPUDCAST_COOKIE_SECRET=replace-with-openssl-rand-hex-32

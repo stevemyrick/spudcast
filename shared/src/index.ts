@@ -189,7 +189,8 @@ export type RemoteAction =
   | "channel_down"
   | "set_channel"
   | "toggle_guide"
-  | "toggle_mute";
+  | "toggle_mute"
+  | "toggle_crt";
 
 export interface RemoteCommand {
   action: RemoteAction;

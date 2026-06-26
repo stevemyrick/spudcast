@@ -133,6 +133,21 @@ body {
   color: #f87171; font-weight: 800; letter-spacing: 0.2em;
 }
 
+/* CRT shader: scanlines + subtle vignette. Harmless on a real CRT, fun on a flat panel. */
+.crt {
+  position: absolute; inset: 0; z-index: 7; pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.18) 0px,
+      rgba(0, 0, 0, 0.18) 1px,
+      transparent 1px,
+      transparent 3px
+    ),
+    radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.35) 100%);
+  mix-blend-mode: multiply;
+}
+
 /* Phone remote */
 .remote {
   min-height: 100vh; background: #0b0f1a; color: #e8edf7; cursor: auto;
@@ -157,5 +172,5 @@ body {
 .num-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .num-pad button { padding: 18px 0; font-size: 1.3rem; }
 .num-pad .enter { grid-column: span 3; background: #1d2a44; }
-.remote-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.remote-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .remote-actions button { padding: 16px 0; }

@@ -1,0 +1,20 @@
+# Keep the Docker build context small and prevent host artifacts/secrets from
+# leaking into the image. Frontends are built inside the builder stage.
+node_modules
+**/node_modules
+**/dist
+**/build
+data
+**/data
+*.sqlite
+*.sqlite-*
+.git
+.gitignore
+*.log
+npm-debug.log*
+.DS_Store
+.env
+.env.*
+coverage
+**/.cache
+docker/data

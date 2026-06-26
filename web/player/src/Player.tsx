@@ -18,6 +18,7 @@ export function Player() {
   const [showGuide, setShowGuide] = useState(false);
   const [aspect, setAspect] = useState<AspectMode>("contain");
   const [muted, setMuted] = useState(false);
+  const [crt, setCrt] = useState(false);
   const [roomCode, setRoomCode] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const bugTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -125,6 +126,9 @@ export function Player() {
         case "toggle_mute":
           setMuted((m) => !m);
           break;
+        case "toggle_crt":
+          setCrt((c) => !c);
+          break;
       }
     },
     [changeChannel, channels],
@@ -175,6 +179,10 @@ export function Player() {
         case "a":
         case "A":
           setAspect((m) => (m === "contain" ? "cover" : m === "cover" ? "fill" : "contain"));
+          break;
+        case "s":
+        case "S":
+          setCrt((c) => !c);
           break;
         case "i":
         case "I":
@@ -234,6 +242,9 @@ export function Player() {
       )}
 
       {muted && <div className="mute-badge">MUTED</div>}
+
+      {/* Optional CRT scanline/vignette shader overlay (toggle: S key / remote). */}
+      {crt && <div className="crt" aria-hidden />}
     </div>
   );
 }

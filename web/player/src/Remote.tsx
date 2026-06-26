@@ -98,6 +98,7 @@ export function Remote() {
         <div className="remote-actions">
           <button onClick={() => send("toggle_guide")}>Guide</button>
           <button onClick={() => send("toggle_mute")}>Mute</button>
+          <button onClick={() => send("toggle_crt")}>CRT</button>
         </div>
       </div>
     </div>
