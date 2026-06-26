@@ -40,6 +40,7 @@ URL/key), **Refresh library**, create a channel, and set up a TV.
 
 - Full NAS walkthrough: **[docs/synology-deploy.md](docs/synology-deploy.md)**
 - Turning a Pi/mini-PC into the CRT TV: **[docs/kiosk-crt-setup.md](docs/kiosk-crt-setup.md)**
+- Security posture & audit notes: **[docs/security.md](docs/security.md)**
 
 > **LAN-only by default.** Don't expose spudcast to the internet without a reverse proxy +
 > TLS (or a VPN). See the deploy doc.
@@ -59,6 +60,7 @@ Open the admin at http://localhost:5173 and complete the first-run wizard. The p
 ```bash
 pnpm build      # build the admin + player bundles
 pnpm typecheck  # typecheck every package
+pnpm test       # backend unit + integration tests (vitest)
 ```
 
 ## Architecture
