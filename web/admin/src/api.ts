@@ -60,6 +60,10 @@ export const api = {
   syncStatus: () => jsonFetch<SyncStatus>("/api/library/sync-status"),
   refreshLibrary: () =>
     jsonFetch<LibrarySyncResult>("/api/library/refresh", { method: "POST" }),
+  iptvInfo: () =>
+    jsonFetch<{ key: string; playlistUrl: string; xmltvUrl: string }>("/api/iptv/info"),
+  regenerateIptv: () =>
+    jsonFetch<{ key: string }>("/api/iptv/regenerate", { method: "POST" }),
   genres: () => jsonFetch<string[]>("/api/library/genres"),
   previewRules: (rules: AutoRules) =>
     jsonFetch<{ count: number; sample: string[] }>("/api/library/preview", {

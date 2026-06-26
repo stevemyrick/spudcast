@@ -94,6 +94,22 @@ docker build -f docker/Dockerfile -t spudcast:latest .
 cd docker && docker compose up -d   # recreates the container; /data persists
 ```
 
+## IPTV export (Plex / Jellyfin / VLC / TiviMate)
+
+spudcast can also expose its channels as a standard **M3U playlist + XMLTV guide**,
+so they show up in other players:
+
+- In the admin: **Settings → IPTV export** has ready-made URLs (they include a
+  private key). Copy the **M3U** URL into your IPTV player and the **XMLTV** URL as
+  the guide source.
+- The Jellyfin API key is never exposed — streams are served through spudcast's own
+  proxy, authorized by the IPTV key. **Regenerate** the key to revoke old URLs.
+- Keep these URLs on your LAN.
+
+> External players show the **current program** on each channel; the full
+> mid-program "linear TV" experience (with static transitions, bug, and instant
+> channel changes) is the spudcast **player** at `/tv`.
+
 ## Exposing it safely
 
 spudcast binds `0.0.0.0:8080` for LAN access. To reach it from outside your network:

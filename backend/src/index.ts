@@ -18,6 +18,7 @@ import { deviceRoutes } from "./routes/devices.js";
 import { controlRoutes } from "./routes/control.js";
 import { userRoutes } from "./routes/users.js";
 import { uploadRoutes } from "./routes/upload.js";
+import { iptvRoutes } from "./routes/iptv.js";
 import { startSyncSchedule } from "./services/syncSchedule.js";
 
 async function main(): Promise<void> {
@@ -47,6 +48,7 @@ async function main(): Promise<void> {
   await app.register(controlRoutes);
   await app.register(userRoutes);
   await app.register(uploadRoutes);
+  await app.register(iptvRoutes);
 
   // Serve the built frontends in production: admin at /, player at /tv.
   const adminDir = join(config.webDir, "admin");

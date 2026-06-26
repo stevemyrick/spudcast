@@ -2,6 +2,7 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import type { User } from "@spudcast/shared";
 import { getSessionUser } from "./session.js";
 import { verifyDeviceToken, type Device } from "./services/devices.js";
+import { isValidIptvKey } from "./services/settings.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -60,5 +61,8 @@ export async function requireViewer(req: FastifyRequest, reply: FastifyReply): P
     req.currentDevice = device;
     return;
   }
+  // IPTV capability key (?key= or token) lets external players fetch streams.
+  const key = (req.query as { key?: string })?.key ?? token;
+  if (isValidIptvKey(key)) return;
   return reply.code(401).send({ error: "Authentication required" });
 }

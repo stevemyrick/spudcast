@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import type {
   JellyfinSettings,
   Settings,
@@ -63,6 +64,31 @@ export function getSettingsView(): SettingsView {
     dailySyncTime: getRaw("sync.dailyTime") ?? DEFAULT_SYNC_TIME,
     lastSyncAt: getRaw("sync.lastAt") ?? null,
   };
+}
+
+/**
+ * A capability key for the IPTV (M3U/XMLTV) endpoints, generated on first use.
+ * It authorizes guide/stream access only (same posture as a TV device token) so
+ * external players can reach spudcast without exposing the Jellyfin key.
+ */
+export function getOrCreateIptvKey(): string {
+  let key = getRaw("iptv.key");
+  if (!key) {
+    key = randomBytes(24).toString("hex");
+    setRaw("iptv.key", key);
+  }
+  return key;
+}
+
+export function regenerateIptvKey(): string {
+  const key = randomBytes(24).toString("hex");
+  setRaw("iptv.key", key);
+  return key;
+}
+
+export function isValidIptvKey(key: string | undefined | null): boolean {
+  if (!key) return false;
+  return key === getRaw("iptv.key");
 }
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;

@@ -77,6 +77,48 @@ export function SettingsView() {
         </div>
         {msg && <p className="muted small">{msg}</p>}
       </form>
+
+      <IptvSection />
+    </div>
+  );
+}
+
+/** Expose the M3U + XMLTV URLs for playing spudcast channels in Plex/Jellyfin/VLC/TiviMate. */
+function IptvSection() {
+  const [info, setInfo] = useState<{ playlistUrl: string; xmltvUrl: string } | null>(null);
+
+  async function load() {
+    setInfo(await api.iptvInfo());
+  }
+  useEffect(() => {
+    load().catch(() => undefined);
+  }, []);
+
+  async function regenerate() {
+    if (!confirm("Regenerate the IPTV key? Existing player URLs will stop working.")) return;
+    await api.regenerateIptv();
+    await load();
+  }
+
+  if (!info) return null;
+  return (
+    <div className="form" style={{ marginTop: 20 }}>
+      <h3>IPTV export</h3>
+      <p className="muted small">
+        Play spudcast channels in Plex/Jellyfin/VLC/TiviMate. The URLs include a private key — keep them on your LAN.
+        (External players show the current program; the spudcast TV is the full mid-program experience.)
+      </p>
+      <label>
+        M3U playlist
+        <input readOnly value={info.playlistUrl} onFocus={(e) => e.target.select()} />
+      </label>
+      <label>
+        XMLTV guide
+        <input readOnly value={info.xmltvUrl} onFocus={(e) => e.target.select()} />
+      </label>
+      <div className="row">
+        <button type="button" className="ghost danger" onClick={regenerate}>Regenerate key</button>
+      </div>
     </div>
   );
 }
