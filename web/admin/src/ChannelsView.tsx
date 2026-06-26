@@ -177,6 +177,8 @@ function ChannelEditor({ channelId, onBack }: { channelId: number; onBack: () =>
         <button className="ghost danger" onClick={del}>Delete</button>
       </div>
 
+      <FillerControls channel={channel} onChange={setChannel} />
+
       {isAuto ? (
         <div>
           <h3>Auto lineup · {items.length} programs · {fmtDur(totalMs)} loop</h3>
@@ -223,6 +225,60 @@ function ChannelEditor({ channelId, onBack }: { channelId: number; onBack: () =>
           <LibraryPicker onAdd={add} onUploaded={add} />
         </div>
       )}
+    </div>
+  );
+}
+
+/** Toggle retro commercial breaks between programs, drawn from the commercial/bumper pool. */
+function FillerControls({ channel, onChange }: { channel: Channel; onChange: (c: Channel) => void }) {
+  const filler = (channel.config as { filler?: { enabled: boolean; perBreak: number } } | null)?.filler;
+  const [enabled, setEnabled] = useState(Boolean(filler?.enabled));
+  const [perBreak, setPerBreak] = useState(filler?.perBreak ?? 1);
+  const [poolCount, setPoolCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    api
+      .previewRules({ types: ["commercial", "bumper"], limit: 2000 })
+      .then((r) => setPoolCount(r.count))
+      .catch(() => setPoolCount(null));
+  }, []);
+
+  async function save(nextEnabled: boolean, nextPerBreak: number) {
+    setEnabled(nextEnabled);
+    setPerBreak(nextPerBreak);
+    const updated = await api.updateChannel(channel.id, {
+      config: { ...(channel.config as object), filler: { enabled: nextEnabled, perBreak: nextPerBreak } },
+    });
+    onChange(updated);
+  }
+
+  return (
+    <div className="filler-bar">
+      <label className="check">
+        <input type="checkbox" checked={enabled} onChange={(e) => save(e.target.checked, perBreak)} />
+        Commercial breaks
+      </label>
+      {enabled && (
+        <label className="muted small">
+          clips between programs:&nbsp;
+          <input
+            type="number"
+            min={1}
+            max={10}
+            value={perBreak}
+            onChange={(e) => save(true, Math.max(1, Math.min(10, Number(e.target.value) || 1)))}
+            style={{ width: 56 }}
+          />
+        </label>
+      )}
+      <span className="spacer" />
+      <span className="muted small">
+        {poolCount === null
+          ? ""
+          : poolCount === 0
+            ? "No commercials/bumpers uploaded yet — add some in the library."
+            : `${poolCount} clip${poolCount === 1 ? "" : "s"} in the commercial pool`}
+      </span>
     </div>
   );
 }

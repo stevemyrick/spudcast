@@ -148,6 +148,18 @@ export interface AutoRules {
   limit?: number;
 }
 
+/** Retro "commercial break" filler inserted between programs in a channel's loop. */
+export interface FillerConfig {
+  enabled: boolean;
+  /** How many filler clips (commercials/bumpers) to play between each program. */
+  perBreak: number;
+}
+
+/** Free-form per-channel config (filler now; weather location/audio later). */
+export interface ChannelConfig {
+  filler?: FillerConfig;
+}
+
 export interface CreateChannelRequest {
   number: number;
   name: string;
@@ -155,6 +167,7 @@ export interface CreateChannelRequest {
   strategy?: ChannelStrategy;
   onAir?: boolean;
   rules?: AutoRules;
+  config?: ChannelConfig;
 }
 
 export interface AddChannelItemsRequest {
@@ -167,6 +180,7 @@ export interface UpdateChannelRequest {
   strategy?: ChannelStrategy;
   iconUrl?: string | null;
   onAir?: boolean;
+  config?: ChannelConfig;
 }
 
 export interface ChannelWithItems {

@@ -26,6 +26,15 @@ const rulesSchema = z.object({
   limit: z.number().int().min(1).max(2000).optional(),
 });
 
+const configSchema = z.object({
+  filler: z
+    .object({
+      enabled: z.boolean(),
+      perBreak: z.number().int().min(0).max(10),
+    })
+    .optional(),
+});
+
 const createSchema = z.object({
   number: z.number().int().min(1).max(9999),
   name: z.string().min(1).max(120),
@@ -33,6 +42,7 @@ const createSchema = z.object({
   strategy: z.enum(["ordered", "shuffle", "dayparts"]).optional(),
   onAir: z.boolean().optional(),
   rules: rulesSchema.optional(),
+  config: configSchema.optional(),
 });
 
 const itemsSchema = z.object({
@@ -49,6 +59,7 @@ const updateSchema = z.object({
   strategy: z.enum(["ordered", "shuffle", "dayparts"]).optional(),
   iconUrl: z.string().max(2048).nullable().optional(),
   onAir: z.boolean().optional(),
+  config: configSchema.optional(),
 });
 
 /** Owner or admin may modify a channel. */
@@ -81,8 +92,10 @@ export async function channelRoutes(app: FastifyInstance): Promise<void> {
     const channel = getById(Number((req.params as { id: string }).id));
     if (!channel) return reply.code(404).send({ error: "Channel not found" });
     if (!canEdit(channel, req.currentUser!)) return reply.code(403).send({ error: "Not your channel" });
-    // Auto channels resolve their lineup from rules; manual use the stored playlist.
-    return { channel, items: resolveChannelItems(channel) };
+    // Auto channels show their resolved lineup (incl. filler) read-only; manual
+    // channels show the raw editable playlist (filler is applied at playback only).
+    const items = channel.type === "auto" ? resolveChannelItems(channel) : getItems(channel.id);
+    return { channel, items };
   });
 
   app.put("/api/channels/:id", { preHandler: requireAuth }, async (req, reply): Promise<Channel | void> => {

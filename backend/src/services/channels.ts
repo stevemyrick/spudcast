@@ -1,4 +1,11 @@
-import type { AutoRules, Channel, ChannelStrategy, ChannelType, LibraryItem } from "@spudcast/shared";
+import type {
+  AutoRules,
+  Channel,
+  ChannelConfig,
+  ChannelStrategy,
+  ChannelType,
+  LibraryItem,
+} from "@spudcast/shared";
 import { db } from "../db.js";
 import { queryByRules } from "./library.js";
 
@@ -39,13 +46,14 @@ export interface CreateChannelInput {
   strategy?: ChannelStrategy;
   onAir?: boolean;
   rules?: AutoRules;
+  config?: ChannelConfig;
 }
 
 export function createChannel(ownerId: number, input: CreateChannelInput): Channel {
   const info = db
     .prepare(
-      `INSERT INTO channels (number, name, ownerId, onAir, type, strategy, rules, enabled)
-       VALUES (@number, @name, @ownerId, @onAir, @type, @strategy, @rules, 1)`,
+      `INSERT INTO channels (number, name, ownerId, onAir, type, strategy, rules, config, enabled)
+       VALUES (@number, @name, @ownerId, @onAir, @type, @strategy, @rules, @config, 1)`,
     )
     .run({
       number: input.number,
@@ -55,6 +63,7 @@ export function createChannel(ownerId: number, input: CreateChannelInput): Chann
       type: input.type ?? "manual",
       strategy: input.strategy ?? "ordered",
       rules: input.rules ? JSON.stringify(input.rules) : null,
+      config: input.config ? JSON.stringify(input.config) : null,
     });
   return getById(Number(info.lastInsertRowid))!;
 }
@@ -88,6 +97,7 @@ export interface UpdateChannelInput {
   strategy?: ChannelStrategy;
   iconUrl?: string | null;
   onAir?: boolean;
+  config?: ChannelConfig;
 }
 
 export function updateChannel(id: number, input: UpdateChannelInput): Channel | undefined {
@@ -98,6 +108,7 @@ export function updateChannel(id: number, input: UpdateChannelInput): Channel | 
   if (input.strategy !== undefined) { sets.push("strategy = @strategy"); args.strategy = input.strategy; }
   if (input.iconUrl !== undefined) { sets.push("iconUrl = @iconUrl"); args.iconUrl = input.iconUrl; }
   if (input.onAir !== undefined) { sets.push("onAir = @onAir"); args.onAir = input.onAir ? 1 : 0; }
+  if (input.config !== undefined) { sets.push("config = @config"); args.config = JSON.stringify(input.config); }
   if (sets.length) db.prepare(`UPDATE channels SET ${sets.join(", ")} WHERE id = @id`).run(args);
   return getById(id);
 }
@@ -151,16 +162,47 @@ function seededShuffle<T>(arr: T[], seed: number): T[] {
 }
 
 /**
+ * Insert "commercial break" filler (commercials/bumpers) between programs when the
+ * channel opts in. Filler comes from the global commercial/bumper pool, stably
+ * shuffled per channel and rotated so breaks vary around the loop.
+ */
+function withFiller(channel: Channel, programs: LibraryItem[]): LibraryItem[] {
+  const filler = (channel.config as ChannelConfig | null)?.filler;
+  if (!filler?.enabled || filler.perBreak < 1 || programs.length === 0) return programs;
+
+  const pool = seededShuffle(
+    queryByRules({ types: ["commercial", "bumper"] }),
+    channel.id + 7,
+  );
+  if (pool.length === 0) return programs;
+
+  const out: LibraryItem[] = [];
+  let f = 0;
+  for (const program of programs) {
+    out.push(program);
+    for (let i = 0; i < filler.perBreak; i++) {
+      out.push(pool[f % pool.length]);
+      f++;
+    }
+  }
+  return out;
+}
+
+/**
  * The items that make up a channel's loop. Manual channels use their stored
  * playlist; auto channels resolve their rules live (so newly-synced content
- * flows in), with a stable shuffle when the strategy calls for it.
+ * flows in), with a stable shuffle when the strategy calls for it. Either kind
+ * can interleave commercial-break filler.
  */
 export function resolveChannelItems(channel: Channel): LibraryItem[] {
-  if (channel.type === "auto") {
-    const items = queryByRules((channel.rules ?? {}) as AutoRules);
-    return channel.strategy === "shuffle" ? seededShuffle(items, channel.id) : items;
-  }
-  return getItems(channel.id);
+  const programs =
+    channel.type === "auto"
+      ? (() => {
+          const items = queryByRules((channel.rules ?? {}) as AutoRules);
+          return channel.strategy === "shuffle" ? seededShuffle(items, channel.id) : items;
+        })()
+      : getItems(channel.id);
+  return withFiller(channel, programs);
 }
 
 /** The ordered library items that make up a manual channel's loop. */
