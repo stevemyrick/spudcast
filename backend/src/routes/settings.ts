@@ -6,7 +6,11 @@ import { applySettingsUpdate, getSettingsView } from "../services/settings.js";
 import { testConnection } from "../services/jellyfin.js";
 
 const updateSchema = z.object({
-  jellyfinBaseUrl: z.string().url().optional(),
+  jellyfinBaseUrl: z
+    .string()
+    .url()
+    .refine((u) => /^https?:\/\//i.test(u), { message: "baseUrl must be http(s)" })
+    .optional(),
   jellyfinApiKey: z.string().min(1).optional(),
   tmdbApiKey: z.string().min(1).optional(),
   omdbApiKey: z.string().min(1).optional(),

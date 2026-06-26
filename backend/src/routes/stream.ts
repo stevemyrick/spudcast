@@ -32,7 +32,12 @@ export async function streamRoutes(app: FastifyInstance): Promise<void> {
     const headers: Record<string, string> = {};
     if (req.headers.range) headers.range = req.headers.range;
 
-    const upstream = await fetch(upstreamUrl, { headers });
+    let upstream: Response;
+    try {
+      upstream = await fetch(upstreamUrl, { headers });
+    } catch {
+      return reply.code(502).send({ error: "Jellyfin unreachable" });
+    }
     if (!upstream.ok && upstream.status !== 206) {
       return reply.code(upstream.status === 404 ? 404 : 502).send({ error: "Upstream stream error" });
     }
@@ -53,7 +58,12 @@ export async function streamRoutes(app: FastifyInstance): Promise<void> {
 
     const headers: Record<string, string> = {};
     if (req.headers.range) headers.range = req.headers.range;
-    const upstream = await fetch(buildAudioStreamUrl(id), { headers });
+    let upstream: Response;
+    try {
+      upstream = await fetch(buildAudioStreamUrl(id), { headers });
+    } catch {
+      return reply.code(502).send({ error: "Jellyfin unreachable" });
+    }
     if (!upstream.ok && upstream.status !== 206) {
       return reply.code(upstream.status === 404 ? 404 : 502).send({ error: "Upstream audio error" });
     }

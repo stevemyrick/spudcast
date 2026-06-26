@@ -12,7 +12,9 @@ const setupSchema = z.object({
   username: z.string().min(3).max(64),
   password: z.string().min(8).max(256),
   jellyfin: z.object({
-    baseUrl: z.string().url(),
+    baseUrl: z.string().url().refine((u) => /^https?:\/\//i.test(u), {
+      message: "baseUrl must be http(s)",
+    }),
     apiKey: z.string().min(1),
   }),
 });

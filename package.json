@@ -11,7 +11,8 @@
     "dev": "concurrently -n backend,admin,player -c blue,green,magenta \"pnpm --filter @spudcast/backend dev\" \"pnpm --filter @spudcast/admin dev\" \"pnpm --filter @spudcast/player dev\"",
     "build": "pnpm --filter @spudcast/admin build && pnpm --filter @spudcast/player build",
     "start": "pnpm --filter @spudcast/backend start",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm --filter @spudcast/backend test"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

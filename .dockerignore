@@ -18,3 +18,7 @@ npm-debug.log*
 coverage
 **/.cache
 docker/data
+# tests aren't needed in the runtime image
+**/tests
+**/*.test.ts
+**/vitest.config.ts

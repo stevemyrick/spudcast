@@ -35,7 +35,10 @@ const configSchema = z.object({
     .optional(),
   weather: z
     .object({
-      embedUrl: z.string().url().max(2048),
+      // http(s) only — z.url() alone would allow javascript:/data: (iframe XSS).
+      embedUrl: z.string().url().max(2048).refine((u) => /^https?:\/\//i.test(u), {
+        message: "embedUrl must be http(s)",
+      }),
       audio: z
         .object({
           kind: z.enum(["none", "youtube", "jellyfin"]),
