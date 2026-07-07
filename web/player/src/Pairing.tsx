@@ -1,42 +1,48 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { playerApi, setToken } from "./api.js";
 
 /** Shows a pairing code and polls until an admin claims it, then stores the token. */
 export function Pairing({ onPaired }: { onPaired: () => void }) {
   const [code, setCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const startedRef = useRef(false);
 
   useEffect(() => {
-    if (startedRef.current) return; // guard React StrictMode double-run
-    startedRef.current = true;
-
     let timer: ReturnType<typeof setInterval> | undefined;
+    let retryTimeout: ReturnType<typeof setTimeout> | undefined;
     let cancelled = false;
 
-    playerApi
-      .startPairing()
-      .then(({ pairingId, code }) => {
-        if (cancelled) return;
-        setCode(code);
-        timer = setInterval(async () => {
-          try {
-            const res = await playerApi.pollPairing(pairingId);
-            if (res.status === "paired") {
-              clearInterval(timer);
-              setToken(res.token);
-              onPaired();
+    function begin() {
+      playerApi
+        .startPairing()
+        .then(({ pairingId, code }) => {
+          if (cancelled) return;
+          setError(null);
+          setCode(code);
+          timer = setInterval(async () => {
+            try {
+              const res = await playerApi.pollPairing(pairingId);
+              if (res.status === "paired") {
+                clearInterval(timer);
+                setToken(res.token);
+                onPaired();
+              }
+            } catch {
+              /* keep polling */
             }
-          } catch {
-            /* keep polling */
-          }
-        }, 2500);
-      })
-      .catch(() => setError("Couldn't reach spudcast. Retrying…"));
+          }, 2500);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setError("Couldn't reach spudcast. Retrying…");
+          retryTimeout = setTimeout(begin, 3000);
+        });
+    }
+    begin();
 
     return () => {
       cancelled = true;
       if (timer) clearInterval(timer);
+      if (retryTimeout) clearTimeout(retryTimeout);
     };
   }, [onPaired]);
 

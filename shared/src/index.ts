@@ -56,6 +56,8 @@ export interface Settings {
   /** Local time-of-day (HH:mm) for the daily library sync. */
   dailySyncTime: string;
   lastSyncAt?: string | null;
+  /** IANA timezone used to display schedule/guide times (default America/New_York). */
+  timezone: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -84,6 +86,10 @@ export interface LibraryItem {
   thumbUrl?: string | null;
   /** Source-specific reference: jellyfin item id, youtube id, or local path. */
   streamRef: string;
+  /** Plot/synopsis, shown in the TV info banner and guide details. */
+  overview?: string | null;
+  /** Content rating (e.g. "TV-Y", "PG-13"), from Jellyfin OfficialRating. */
+  rating?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -102,11 +108,13 @@ export interface Channel {
   type: ChannelType;
   strategy: ChannelStrategy;
   /** Rule set for auto channels (genres/decade/tags/sources). */
-  rules?: Record<string, unknown> | null;
+  rules?: AutoRules | null;
   /** Channel-type config, e.g. weather location + audio source. */
-  config?: Record<string, unknown> | null;
+  config?: ChannelConfig | null;
   iconUrl?: string | null;
   enabled: boolean;
+  /** When true, tuning to this channel on the TV requires the station PIN. */
+  locked?: boolean;
 }
 
 /** A materialized slot in a channel's program guide. */
@@ -147,6 +155,34 @@ export interface ScheduledProgram {
   endUtc: string;
 }
 
+/** A channel's current-loop schedule (program start/end times), for the editor. */
+export interface ChannelSchedule {
+  timezone: string;
+  programs: ScheduledProgram[];
+}
+
+/** One channel's row in the grid guide. */
+export interface GuideChannel {
+  channel: Channel;
+  programs: ScheduledProgram[];
+  /** Always-live channel (e.g. weather) with no program loop. */
+  live?: boolean;
+}
+
+/** The grid guide across all on-air channels for a time window. */
+export interface GuideGrid {
+  startUtc: string;
+  endUtc: string;
+  timezone: string;
+  channels: GuideChannel[];
+}
+
+/** Display config the TV player fetches once at startup (viewer-accessible). */
+export interface TvConfig {
+  /** IANA timezone for the on-screen clock and program times. */
+  timezone: string;
+}
+
 /** Filter rules for an auto-generated channel. All fields are optional/ANDed. */
 export interface AutoRules {
   genres?: string[];
@@ -157,6 +193,12 @@ export interface AutoRules {
   sources?: LibrarySource[];
   /** Max programs to pull into the loop. */
   limit?: number;
+  /** Library item ids the user removed from the auto lineup (still self-updating otherwise). */
+  excludeIds?: number[];
+  /** User-pinned ordering by library item id; matched items not listed here follow in default order. */
+  order?: number[];
+  /** Allowed content ratings (Jellyfin OfficialRating). Empty/omitted = no rating filter. */
+  ratings?: string[];
 }
 
 /** Retro "commercial break" filler inserted between programs in a channel's loop. */
@@ -207,6 +249,8 @@ export interface UpdateChannelRequest {
   iconUrl?: string | null;
   onAir?: boolean;
   config?: ChannelConfig;
+  rules?: AutoRules;
+  locked?: boolean;
 }
 
 export interface ChannelWithItems {
@@ -230,7 +274,11 @@ export type RemoteAction =
   | "set_channel"
   | "toggle_guide"
   | "toggle_mute"
-  | "toggle_crt";
+  | "toggle_crt"
+  | "toggle_info"
+  | "last_channel"
+  | "toggle_favorite"
+  | "favorites_only";
 
 export interface RemoteCommand {
   action: RemoteAction;
@@ -298,6 +346,9 @@ export interface SettingsView {
   hasYoutubeKey: boolean;
   dailySyncTime: string;
   lastSyncAt: string | null;
+  timezone: string;
+  /** Whether a household/parental PIN is configured. */
+  hasStationPin: boolean;
 }
 
 /** Partial update from the admin. Empty/omitted secret fields leave them unchanged. */
@@ -308,10 +359,40 @@ export interface SettingsUpdate {
   omdbApiKey?: string;
   youtubeApiKey?: string;
   dailySyncTime?: string;
+  timezone?: string;
 }
 
 export interface ConnectionTestResult {
   ok: boolean;
   /** Server name / version on success, or an error message on failure. */
   detail: string;
+}
+
+// ---------------------------------------------------------------------------
+// Shared formatting helpers (used by both admin and player frontends)
+// ---------------------------------------------------------------------------
+
+/** Format a duration in ms as "Xm" or "Xh Ym". */
+export function fmtDuration(ms: number): string {
+  const m = Math.round(ms / 60000);
+  return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+
+/** Format an ISO instant as a wall-clock time (e.g. "3:05 PM") in the given IANA timezone. */
+export function fmtTime(iso: string, timezone?: string): string {
+  return new Date(iso).toLocaleTimeString([], {
+    timeZone: timezone,
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+/** Format a Date as a clock string in the given timezone; 24-hour when hour24 is set. */
+export function fmtClock(date: Date, timezone?: string, hour24 = false): string {
+  return date.toLocaleTimeString([], {
+    timeZone: timezone,
+    hour: hour24 ? "2-digit" : "numeric",
+    minute: "2-digit",
+    hour12: !hour24,
+  });
 }

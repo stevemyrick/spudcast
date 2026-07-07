@@ -34,23 +34,41 @@ its security posture and the results of an audit pass.
   unhandled 500 when Jellyfin is unreachable; rule queries are NaN-safe.
 - **Headers:** `X-Content-Type-Options: nosniff` on all responses.
 
+## Fixed in the second hardening pass
+
+- **Timing-safe capability compare.** The IPTV key is now validated with
+  `crypto.timingSafeEqual` (length-guarded) instead of `===`, closing a timing
+  oracle. Device tokens are validated by an indexed SQL lookup (no client-side
+  byte compare), so they carry no equivalent oracle.
+- **Remote-control `Origin` check (CSWSH).** `/api/control` now rejects browser
+  Origins that aren't localhost / private-LAN (or an explicit
+  `SPUDCAST_ALLOWED_ORIGINS` allowlist). Non-browser clients (no Origin) are
+  still accepted.
+- **Stronger room codes.** Remote room codes went from 4 → 6 characters, and both
+  room and pairing codes now use an unbiased 5-bit mask (`byte & 31`) over the
+  32-char alphabet instead of biased modulo.
+- **Rate-limit memory.** The login-throttle bucket sweep is now time-gated (runs
+  at least once a minute), so stale buckets are reclaimed even below the
+  size threshold.
+
 ## Known limitations / accepted risks (LAN posture)
 
 - **No TLS by default.** Exposing spudcast to the internet requires a reverse
   proxy + TLS (also needed for the `Secure` cookie) or a VPN. See
   `synology-deploy.md`.
-- **Remote-control WebSocket** has no `Origin` check (CSWSH). Impact is limited to
-  channel up/down/mute on a TV, and a remote must still know the TV's short room
-  code (shown only on the physical screen). Acceptable for a single-home LAN; an
-  `Origin` allowlist is the hardening step if spudcast is ever exposed.
-- **Room codes are 4 characters** (ephemeral, per TV connection) — fine on a LAN,
-  not a public-internet control plane.
+- **Remote-control WebSocket** accepts any localhost/private-LAN Origin (and a
+  remote must still know the TV's 6-char room code shown only on-screen). Set
+  `SPUDCAST_ALLOWED_ORIGINS` to tighten this if you front spudcast with a proxy.
+- **Jellyfin `baseUrl`** is restricted to `http(s)` but not checked against
+  private/metadata IP ranges — an admin is trusted to point it at their own
+  server. Harden with an egress allowlist if that trust boundary changes.
 - **Embedded content** (ws4kp, YouTube) runs in sandboxed iframes; only `http(s)`
   embed URLs are allowed and YouTube input is reduced to a validated video id.
 
 ## If you expose it beyond the LAN
 
 1. Terminate TLS at a reverse proxy; keep `NODE_ENV=production` so cookies are `Secure`.
-2. Consider an `Origin` check on the `/api/control` WebSocket.
+2. Set `SPUDCAST_ALLOWED_ORIGINS` to your proxy's public origin(s) so the
+   `/api/control` WebSocket only accepts the intended front-end.
 3. Rotate the IPTV key (`Settings → IPTV → Regenerate`) and treat the M3U/XMLTV
    URLs as secrets.

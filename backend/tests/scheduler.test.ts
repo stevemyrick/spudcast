@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { resetDb, seedItem } from "./helpers.js";
-import { createChannel, setItems, updateChannel } from "../src/services/channels.js";
-import { getGuide, nowPlaying } from "../src/services/scheduler.js";
+import { createChannel, getById, setItems, updateChannel } from "../src/services/channels.js";
+import { getChannelSchedule, getGuide, getGuideUntil, nowPlaying } from "../src/services/scheduler.js";
 import { db } from "../src/db.js";
 
 function makeOwner(): number {
@@ -69,6 +69,40 @@ describe("scheduler", () => {
     // Every other slot is the ad.
     expect(titles.filter((t) => t === "AD").length).toBe(2);
     expect(titles.filter((t) => t !== "AD").length).toBe(2);
+  });
+
+  it("builds a current-loop schedule in lineup order with contiguous times", () => {
+    const owner = makeOwner();
+    const a = seedItem({ title: "A", durationMs: 60_000 });
+    const b = seedItem({ title: "B", durationMs: 120_000 });
+    const ch = createChannel(owner, { number: 21, name: "Sched", onAir: true });
+    setItems(ch.id, [a, b]);
+
+    const progs = getChannelSchedule(getById(ch.id)!);
+    expect(progs.map((p) => p.item.title)).toEqual(["A", "B"]);
+    // Contiguous and matching each item's duration.
+    expect(progs[0].endUtc).toBe(progs[1].startUtc);
+    expect(new Date(progs[0].endUtc).getTime() - new Date(progs[0].startUtc).getTime()).toBe(60_000);
+    // The current instant falls within the pass.
+    const start = new Date(progs[0].startUtc).getTime();
+    const end = new Date(progs[1].endUtc).getTime();
+    expect(Date.now()).toBeGreaterThanOrEqual(start);
+    expect(Date.now()).toBeLessThanOrEqual(end);
+  });
+
+  it("walks the guide forward until a time bound", () => {
+    const owner = makeOwner();
+    const a = seedItem({ title: "A", durationMs: 60_000 });
+    const b = seedItem({ title: "B", durationMs: 60_000 });
+    const ch = createChannel(owner, { number: 22, name: "Win", onAir: true });
+    setItems(ch.id, [a, b]);
+
+    const nowMs = Date.now();
+    const progs = getGuideUntil(getById(ch.id)!, nowMs + 5 * 60_000, nowMs);
+    // At least 5 one-minute slots to cover a 5-minute window.
+    expect(progs.length).toBeGreaterThanOrEqual(5);
+    // Every slot starts before the window end.
+    for (const p of progs) expect(new Date(p.startUtc).getTime()).toBeLessThan(nowMs + 5 * 60_000);
   });
 
   it("returns null for an empty or unknown channel", () => {

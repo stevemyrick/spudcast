@@ -1,21 +1,21 @@
 import { useEffect, useState } from "react";
 import type { Channel, ScheduledProgram } from "@spudcast/shared";
+import { fmtTime } from "@spudcast/shared";
 import { playerApi } from "./api.js";
-
-function hhmm(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
+import { QrCode } from "./QrCode.js";
 
 /** On-screen "what's on now / next" guide overlay across the on-air lineup. */
 export function Guide({
   channels,
   currentNumber,
   roomCode,
+  timezone,
   onClose,
 }: {
   channels: Channel[];
   currentNumber: number;
   roomCode: string | null;
+  timezone?: string;
   onClose: () => void;
 }) {
   const [rows, setRows] = useState<Record<number, ScheduledProgram[]>>({});
@@ -47,7 +47,7 @@ export function Guide({
               <div className="guide-progs">
                 {progs.map((p, i) => (
                   <span key={i} className={i === 0 ? "prog now" : "prog"}>
-                    <span className="prog-time">{hhmm(p.startUtc)}</span> {p.item.title}
+                    <span className="prog-time">{fmtTime(p.startUtc, timezone)}</span> {p.item.title}
                   </span>
                 ))}
                 {progs.length === 0 && <span className="prog muted">—</span>}
@@ -57,8 +57,16 @@ export function Guide({
         })}
       </div>
       <div className="guide-foot">
-        {roomCode ? <>Remote: open <b>/tv/remote</b> and enter code <b>{roomCode}</b> · </> : null}
-        Press G to close
+        {roomCode ? (
+          <div className="guide-pair">
+            <QrCode value={`${location.origin}/tv/remote?room=${roomCode}`} size={104} />
+            <div>
+              <div className="guide-pair-title">Scan for the phone remote</div>
+              <div className="muted">or open <b>/tv/remote</b> and enter code <b>{roomCode}</b></div>
+            </div>
+          </div>
+        ) : null}
+        <div className="guide-close-hint">Press G to close</div>
       </div>
     </div>
   );

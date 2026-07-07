@@ -67,4 +67,29 @@ describe("auto-channel rules", () => {
     expect(() => queryByRules({ limit: "abc" as unknown as number })).not.toThrow();
     expect(queryByRules({ limit: "abc" as unknown as number })).toHaveLength(3);
   });
+
+  it("drops excluded items and applies user-pinned order (overlay)", () => {
+    const a = seedItem({ title: "A", year: 1990 });
+    const b = seedItem({ title: "B", year: 1990 });
+    const c = seedItem({ title: "C", year: 1990 });
+
+    // Exclude B; the rest stay in the lineup.
+    expect(queryByRules({ excludeIds: [b] }).map((i) => i.title)).toEqual(["A", "C"]);
+
+    // Pin C first, then A; unlisted (B) follows in default id order.
+    expect(queryByRules({ order: [c, a] }).map((i) => i.title)).toEqual(["C", "A", "B"]);
+
+    // Order is applied before the limit, so pinned items survive the cap.
+    expect(queryByRules({ order: [c], limit: 1 }).map((i) => i.title)).toEqual(["C"]);
+  });
+
+  it("filters by content rating (parental), excluding unrated items", () => {
+    seedItem({ title: "Kids", rating: "TV-Y" });
+    seedItem({ title: "Teen", rating: "TV-14" });
+    seedItem({ title: "Unrated", rating: null });
+
+    expect(queryByRules({ ratings: ["TV-Y"] }).map((i) => i.title)).toEqual(["Kids"]);
+    // A rating filter excludes items with no rating (safe default).
+    expect(queryByRules({ ratings: ["TV-Y", "TV-14"] }).map((i) => i.title).sort()).toEqual(["Kids", "Teen"]);
+  });
 });

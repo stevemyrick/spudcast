@@ -36,12 +36,13 @@ export function seedItem(over: Partial<{
   year: number | null;
   genres: string[];
   streamRef: string;
+  rating: string | null;
 }> = {}): number {
   const ext = over.externalId ?? `ext-${Math.random().toString(36).slice(2)}`;
   const info = db
     .prepare(
-      `INSERT INTO library_items (source, externalId, title, type, durationMs, year, genres, tags, streamRef)
-       VALUES (@source,@externalId,@title,@type,@durationMs,@year,@genres,'[]',@streamRef)`,
+      `INSERT INTO library_items (source, externalId, title, type, durationMs, year, genres, tags, streamRef, rating)
+       VALUES (@source,@externalId,@title,@type,@durationMs,@year,@genres,'[]',@streamRef,@rating)`,
     )
     .run({
       source: over.source ?? "local",
@@ -52,6 +53,7 @@ export function seedItem(over: Partial<{
       year: over.year ?? null,
       genres: JSON.stringify(over.genres ?? []),
       streamRef: over.streamRef ?? ext,
+      rating: over.rating ?? null,
     });
   return Number(info.lastInsertRowid);
 }

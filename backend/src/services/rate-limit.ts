@@ -15,8 +15,16 @@ const LOCK_MS = 15 * 60 * 1000;
 
 const buckets = new Map<string, Bucket>();
 
+const SWEEP_INTERVAL_MS = 60 * 1000;
+let lastSweepAt = 0;
+
+/**
+ * Drop expired buckets so memory stays bounded on long-running instances. Runs
+ * at most once a minute (time-gated), or immediately once the map grows large.
+ */
 function sweep(now: number): void {
-  if (buckets.size < 1000) return;
+  if (buckets.size < 1000 && now - lastSweepAt < SWEEP_INTERVAL_MS) return;
+  lastSweepAt = now;
   for (const [k, b] of buckets) {
     if (b.lockedUntil < now && b.windowResetAt < now) buckets.delete(k);
   }

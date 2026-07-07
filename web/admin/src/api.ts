@@ -1,13 +1,16 @@
 import type {
   AutoRules,
   Channel,
+  ChannelSchedule,
   ChannelWithItems,
   ConnectionTestResult,
   CreateChannelRequest,
+  GuideGrid,
   LibraryItem,
   LibraryPage,
   LibraryQuery,
   LibrarySyncResult,
+  NowPlaying,
   SessionInfo,
   SettingsUpdate,
   SettingsView,
@@ -21,7 +24,10 @@ import type {
 async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    headers: {
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...(init?.headers ?? {}),
+    },
     credentials: "same-origin",
   });
   if (!res.ok) {
@@ -78,6 +84,9 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(body),
     }),
+  setStationPin: (pin: string) =>
+    jsonFetch<SettingsView>("/api/settings/pin", { method: "PUT", body: JSON.stringify({ pin }) }),
+  ratings: () => jsonFetch<string[]>("/api/library/ratings"),
   testJellyfin: () =>
     jsonFetch<ConnectionTestResult>("/api/settings/jellyfin/test", { method: "POST" }),
 
@@ -107,6 +116,11 @@ export const api = {
   // --- Channels ---
   channels: (all = true) => jsonFetch<Channel[]>(`/api/channels${all ? "?all=true" : ""}`),
   channel: (id: number) => jsonFetch<ChannelWithItems>(`/api/channels/${id}`),
+  nowPlaying: (channelNumber: number) =>
+    jsonFetch<NowPlaying>(`/api/now-playing/${channelNumber}`),
+  channelSchedule: (id: number) =>
+    jsonFetch<ChannelSchedule>(`/api/channels/${id}/schedule`),
+  guideGrid: (hours = 3) => jsonFetch<GuideGrid>(`/api/guide?hours=${hours}`),
   createChannel: (body: CreateChannelRequest) =>
     jsonFetch<Channel>("/api/channels", { method: "POST", body: JSON.stringify(body) }),
   updateChannel: (id: number, body: UpdateChannelRequest) =>

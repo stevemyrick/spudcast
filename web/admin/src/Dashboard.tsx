@@ -6,8 +6,9 @@ import { SettingsView } from "./SettingsView.js";
 import { DevicesView } from "./DevicesView.js";
 import { UsersView } from "./UsersView.js";
 import { ChannelsView } from "./ChannelsView.js";
+import { GuideView } from "./GuideView.js";
 
-type Tab = "channels" | "library" | "devices" | "users" | "settings";
+type Tab = "channels" | "guide" | "library" | "devices" | "users" | "settings";
 
 /** Home shell once setup + login are complete. Channel building lands in M3. */
 export function Dashboard({ session, onLogout }: { session: SessionInfo; onLogout: () => void }) {
@@ -25,6 +26,7 @@ export function Dashboard({ session, onLogout }: { session: SessionInfo; onLogou
         <span className="logo small">spudcast</span>
         <nav className="tabs">
           <button className={tab === "channels" ? "tab active" : "tab"} onClick={() => setTab("channels")}>Channels</button>
+          <button className={tab === "guide" ? "tab active" : "tab"} onClick={() => setTab("guide")}>Guide</button>
           <button className={tab === "library" ? "tab active" : "tab"} onClick={() => setTab("library")}>Library</button>
           {isAdmin && (
             <button className={tab === "devices" ? "tab active" : "tab"} onClick={() => setTab("devices")}>Devices</button>
@@ -42,6 +44,7 @@ export function Dashboard({ session, onLogout }: { session: SessionInfo; onLogou
       </header>
       <main className="content">
         {tab === "channels" && <ChannelsView session={session} />}
+        {tab === "guide" && <GuideView />}
         {tab === "library" && <LibraryView />}
         {tab === "devices" && isAdmin && <DevicesView />}
         {tab === "users" && isAdmin && <UsersView session={session} />}

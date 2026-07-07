@@ -63,9 +63,10 @@ export async function iptvRoutes(app: FastifyInstance): Promise<void> {
     const base = baseUrlOf(req);
     const lines = ["#EXTM3U"];
     for (const c of listChannels({ onAirOnly: true })) {
+      const logo = c.iconUrl ? ` tvg-logo="${escapeXml(c.iconUrl)}"` : "";
       lines.push(
         `#EXTINF:-1 tvg-id="spud.${c.number}" tvg-name="${escapeXml(c.name)}" ` +
-          `tvg-chno="${c.number}" group-title="spudcast",${c.name}`,
+          `tvg-chno="${c.number}"${logo} group-title="spudcast",${c.name}`,
       );
       lines.push(`${base}/api/iptv/stream/${c.number}?key=${key}`);
     }

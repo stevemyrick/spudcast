@@ -7,7 +7,7 @@ import type {
   LibraryItem,
 } from "@spudcast/shared";
 import { db } from "../db.js";
-import { queryByRules } from "./library.js";
+import { queryByRules, rowToItem, type LibraryRow } from "./library.js";
 
 interface ChannelRow {
   id: number;
@@ -21,6 +21,7 @@ interface ChannelRow {
   config: string | null;
   iconUrl: string | null;
   enabled: number;
+  locked: number;
 }
 
 function rowToChannel(r: ChannelRow): Channel {
@@ -32,10 +33,11 @@ function rowToChannel(r: ChannelRow): Channel {
     onAir: Boolean(r.onAir),
     type: r.type as ChannelType,
     strategy: r.strategy as ChannelStrategy,
-    rules: r.rules ? (JSON.parse(r.rules) as Record<string, unknown>) : null,
-    config: r.config ? (JSON.parse(r.config) as Record<string, unknown>) : null,
+    rules: r.rules ? (JSON.parse(r.rules) as AutoRules) : null,
+    config: r.config ? (JSON.parse(r.config) as ChannelConfig) : null,
     iconUrl: r.iconUrl,
     enabled: Boolean(r.enabled),
+    locked: Boolean(r.locked),
   };
 }
 
@@ -98,6 +100,8 @@ export interface UpdateChannelInput {
   iconUrl?: string | null;
   onAir?: boolean;
   config?: ChannelConfig;
+  rules?: AutoRules;
+  locked?: boolean;
 }
 
 export function updateChannel(id: number, input: UpdateChannelInput): Channel | undefined {
@@ -109,6 +113,8 @@ export function updateChannel(id: number, input: UpdateChannelInput): Channel | 
   if (input.iconUrl !== undefined) { sets.push("iconUrl = @iconUrl"); args.iconUrl = input.iconUrl; }
   if (input.onAir !== undefined) { sets.push("onAir = @onAir"); args.onAir = input.onAir ? 1 : 0; }
   if (input.config !== undefined) { sets.push("config = @config"); args.config = JSON.stringify(input.config); }
+  if (input.rules !== undefined) { sets.push("rules = @rules"); args.rules = JSON.stringify(input.rules); }
+  if (input.locked !== undefined) { sets.push("locked = @locked"); args.locked = input.locked ? 1 : 0; }
   if (sets.length) db.prepare(`UPDATE channels SET ${sets.join(", ")} WHERE id = @id`).run(args);
   return getById(id);
 }
@@ -213,30 +219,6 @@ export function getItems(channelId: number): LibraryItem[] {
        JOIN library_items li ON li.id = ci.libraryItemId
        WHERE ci.channelId = ? ORDER BY ci.ord`,
     )
-    .all(channelId) as Array<{
-    id: number;
-    source: string;
-    externalId: string;
-    title: string;
-    type: string;
-    durationMs: number;
-    year: number | null;
-    genres: string;
-    tags: string;
-    thumbUrl: string | null;
-    streamRef: string;
-  }>;
-  return rows.map((r) => ({
-    id: r.id,
-    source: r.source as LibraryItem["source"],
-    externalId: r.externalId,
-    title: r.title,
-    type: r.type as LibraryItem["type"],
-    durationMs: r.durationMs,
-    year: r.year,
-    genres: JSON.parse(r.genres) as string[],
-    tags: JSON.parse(r.tags) as string[],
-    thumbUrl: r.thumbUrl,
-    streamRef: r.streamRef,
-  }));
+    .all(channelId) as LibraryRow[];
+  return rows.map(rowToItem);
 }

@@ -12,20 +12,33 @@ served from a local SQLite cache, so an **idle TV makes zero media-disk activity
 can sleep.
 
 > Status: active development. Working today: Jellyfin sync, the deterministic scheduler, the
-> kiosk player (mid-program join, channel bug, static transition, guide, failover slate),
-> TV pairing + phone remote, multi-user auth, the Channel Creator, local clip uploads, and
-> rule-based auto-channels. Roadmap and details in `/.claude/plans`.
+> kiosk player (mid-program join, channel bug, clock, info banner, static transition, grid
+> guide, failover slate), TV pairing + phone remote (with QR pairing), favorites, parental
+> controls, a retro sound/visual pack, multi-user auth, the Channel Creator, local clip
+> uploads, rule-based auto-channels, a grid TV guide, weather channels, and IPTV export.
+> Roadmap and details in `/.claude/plans`.
 
 ## What you can do
 
 - **Connect Jellyfin** once (URL + API key) and sync your library into a local cache.
+  Browse it with type/tag filters in the admin **Library**.
 - **Build channels** by hand — drag in library items, upload your own bumpers/commercials —
-  or **auto-generate** them: pick genre/decade/type and spudcast assembles a self-updating
-  channel (new matching content flows in automatically).
+  or **auto-generate** them: pick genre/decade/type/rating and spudcast assembles a
+  self-updating channel (new matching content flows in automatically; you can still pin,
+  reorder, remove, and cap the lineup).
+- **See the whole schedule** in the admin **Guide** tab — a grid EPG with a live "Now &
+  Next" wallboard; click any program for its metadata.
 - **Pair a TV** at `/tv` (on-screen code → admin → Devices); it joins the on-air lineup
-  mid-program, full-screen.
-- **Control it from your phone** at `/tv/remote` (channel up/down, numbers, guide, mute).
+  mid-program, full-screen, with a channel bug, on-screen clock, and an info banner.
+- **Control it from your phone** at `/tv/remote` — **scan the QR** shown on the TV to pair
+  instantly, then channel up/down, number tune, **Last**-channel recall, **favorites**,
+  guide, info, mute, and CRT toggle.
+- **Keep it family-safe:** set a **station PIN** and mark channels locked (skipped while
+  surfing, PIN-gated to tune to), or build rating-limited auto-channels.
 - **Multi-user:** admins manage everything; regular users create/edit only their own channels.
+
+The TV/remote controls, pairing, favorites, and parental PIN are documented in
+**[docs/tv-and-remote.md](docs/tv-and-remote.md)**.
 
 ## Quick start (Docker — e.g. Synology)
 
@@ -38,6 +51,7 @@ docker compose up -d --build
 Then open `http://<host>:8080`, complete the first-run wizard (admin account + Jellyfin
 URL/key), **Refresh library**, create a channel, and set up a TV.
 
+- Using the TV & phone remote: **[docs/tv-and-remote.md](docs/tv-and-remote.md)**
 - Full NAS walkthrough: **[docs/synology-deploy.md](docs/synology-deploy.md)**
 - Turning a Pi/mini-PC into the CRT TV: **[docs/kiosk-crt-setup.md](docs/kiosk-crt-setup.md)**
 - Security posture & audit notes: **[docs/security.md](docs/security.md)**
@@ -55,7 +69,7 @@ pnpm dev        # backend :8080, admin :5173, player :5174
 ```
 
 Open the admin at http://localhost:5173 and complete the first-run wizard. The player
-(the TV) is at http://localhost:5174 and the phone remote at http://localhost:5174/remote.
+(the TV) is at http://localhost:5174 and the phone remote at http://localhost:5174/tv/remote.
 
 ```bash
 pnpm build      # build the admin + player bundles
@@ -70,8 +84,8 @@ Synology (Docker)                         Kiosk device (Chromium) ─HDMI→RCA�
 ┌─────────────────────────────┐           ┌──────────────────────────────┐
 │ spudcast backend (Node/TS)  │  REST/WS  │ Player "the TV" (/tv)         │
 │  - Jellyfin client + sync   │<────────> │  - asks "what's on Ch N now?" │
-│  - deterministic scheduler  │           │  - <video> direct-play / HLS  │
-│  - channels + library (DB)  │           │  - bug, static, guide, remote │
+│  - deterministic scheduler  │           │  - <video> proxied MP4 stream │
+│  - channels + library (DB)  │           │  - bug, clock, guide, remote  │
 │  - stream/art proxy (keys   │           └──────────────────────────────┘
 │    hidden) + SQLite (/data) │           Phone remote (/tv/remote) ─WS─> backend
 │  - serves admin + player    │
@@ -100,6 +114,10 @@ the browser.
 | `SPUDCAST_DATA_DIR` | `./data` | SQLite db, artwork cache, uploads (mount as a volume; keep on SSD) |
 | `SPUDCAST_WEB_DIR` | `./public` | Built frontends (production) |
 | `SPUDCAST_COOKIE_SECRET` | auto-generated | Session cookie signing secret (`openssl rand -hex 32`) |
+| `SPUDCAST_ALLOWED_ORIGINS` | (LAN only) | Extra allowed `Origin`s for the remote-control WebSocket. localhost/private-LAN are always allowed; set this to your proxy's public origin if you front spudcast with one. |
+
+> The **display timezone** for the on-screen clock, guide, and info banner is set in the admin
+> **Settings → Display** (default US Eastern), separate from the `TZ` sync schedule above.
 
 ## Security posture
 

@@ -8,7 +8,7 @@ import type {
 import { db } from "../db.js";
 import { ticksToMs, type JellyfinItem } from "./jellyfin.js";
 
-interface LibraryRow {
+export interface LibraryRow {
   id: number;
   source: string;
   externalId: string;
@@ -20,9 +20,12 @@ interface LibraryRow {
   tags: string;
   thumbUrl: string | null;
   streamRef: string;
+  overview: string | null;
+  rating: string | null;
 }
 
-function rowToItem(row: LibraryRow): LibraryItem {
+/** Map a raw library_items row to a LibraryItem. Shared by every library query. */
+export function rowToItem(row: LibraryRow): LibraryItem {
   return {
     id: row.id,
     source: row.source as LibraryItem["source"],
@@ -35,6 +38,8 @@ function rowToItem(row: LibraryRow): LibraryItem {
     tags: JSON.parse(row.tags) as string[],
     thumbUrl: row.thumbUrl,
     streamRef: row.streamRef,
+    overview: row.overview,
+    rating: row.rating,
   };
 }
 
@@ -54,14 +59,16 @@ export function mapJellyfinItem(jf: JellyfinItem): Omit<LibraryItem, "id"> {
     tags: jf.Tags ?? [],
     thumbUrl: `/api/art/jellyfin/${jf.Id}`,
     streamRef: jf.Id,
+    overview: jf.Overview ?? null,
+    rating: jf.OfficialRating ?? null,
   };
 }
 
 const upsertStmt = db.prepare(
   `INSERT INTO library_items
-     (source, externalId, title, type, durationMs, year, genres, tags, thumbUrl, streamRef, updatedAt)
+     (source, externalId, title, type, durationMs, year, genres, tags, thumbUrl, streamRef, overview, rating, updatedAt)
    VALUES
-     (@source, @externalId, @title, @type, @durationMs, @year, @genres, @tags, @thumbUrl, @streamRef, datetime('now'))
+     (@source, @externalId, @title, @type, @durationMs, @year, @genres, @tags, @thumbUrl, @streamRef, @overview, @rating, datetime('now'))
    ON CONFLICT(source, externalId) DO UPDATE SET
      title = excluded.title,
      type = excluded.type,
@@ -71,6 +78,8 @@ const upsertStmt = db.prepare(
      tags = excluded.tags,
      thumbUrl = excluded.thumbUrl,
      streamRef = excluded.streamRef,
+     overview = excluded.overview,
+     rating = excluded.rating,
      updatedAt = datetime('now')`,
 );
 
@@ -125,6 +134,8 @@ export function insertLocalItem(input: {
     tags: "[]",
     thumbUrl: null,
     streamRef: input.streamRef,
+    overview: null,
+    rating: null,
   });
   return getByExternalId("local", input.externalId)!;
 }
@@ -181,16 +192,39 @@ export function queryByRules(rules: AutoRules): LibraryItem[] {
     where.push(`(${ors.join(" OR ")})`);
     rules.genres.forEach((g, i) => (args[`g${i}`] = `%"${g}"%`));
   }
+  if (rules.ratings?.length) {
+    // Parental filter: only allowed ratings. Items with no rating are excluded.
+    where.push(`rating IN (${rules.ratings.map((_, i) => `@rt${i}`).join(",")})`);
+    rules.ratings.forEach((r, i) => (args[`rt${i}`] = r));
+  }
 
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
-  // Coerce to a safe integer — this value is interpolated into the SQL, and the
-  // preview endpoint accepts unvalidated rules (a non-numeric limit must not
-  // become "LIMIT NaN").
-  const limit = Math.min(Math.max(Math.floor(Number(rules.limit)) || 500, 1), 2000);
+  // Fetch all matching rows (capped for safety); exclusions, user ordering and
+  // the user-facing limit are applied below so they compose correctly.
   const rows = db
-    .prepare(`SELECT * FROM library_items ${whereSql} ORDER BY id LIMIT ${limit}`)
+    .prepare(`SELECT * FROM library_items ${whereSql} ORDER BY id LIMIT 2000`)
     .all(args) as LibraryRow[];
-  return rows.map(rowToItem);
+  let items = rows.map(rowToItem);
+
+  // Drop items the user removed from the auto lineup.
+  if (rules.excludeIds?.length) {
+    const excluded = new Set(rules.excludeIds);
+    items = items.filter((it) => !excluded.has(it.id));
+  }
+
+  // Apply user-pinned ordering: listed ids first (in that order), the rest after.
+  if (rules.order?.length) {
+    const rank = new Map(rules.order.map((id, i) => [id, i]));
+    items.sort((a, b) => {
+      const ra = rank.has(a.id) ? rank.get(a.id)! : Number.MAX_SAFE_INTEGER;
+      const rb = rank.has(b.id) ? rank.get(b.id)! : Number.MAX_SAFE_INTEGER;
+      return ra !== rb ? ra - rb : a.id - b.id;
+    });
+  }
+
+  // Cap to the user's max-episodes limit (default 500) after ordering.
+  const limit = Math.min(Math.max(Math.floor(Number(rules.limit)) || 500, 1), 2000);
+  return items.slice(0, limit);
 }
 
 /** Distinct genres across the cached library, for the auto-channel wizard. */
@@ -199,6 +233,14 @@ export function distinctGenres(): string[] {
   const set = new Set<string>();
   for (const r of rows) for (const g of JSON.parse(r.genres) as string[]) set.add(g);
   return [...set].sort((a, b) => a.localeCompare(b));
+}
+
+/** Distinct content ratings present in the library (for the parental filter). */
+export function distinctRatings(): string[] {
+  const rows = db
+    .prepare("SELECT DISTINCT rating FROM library_items WHERE rating IS NOT NULL AND rating <> '' ORDER BY rating")
+    .all() as Array<{ rating: string }>;
+  return rows.map((r) => r.rating);
 }
 
 /** Filtered, paginated listing for the admin library browser. */

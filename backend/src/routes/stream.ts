@@ -2,7 +2,7 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import { Readable } from "node:stream";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { requireViewer } from "../auth-guards.js";
 import { buildAudioStreamUrl, buildStreamUrl } from "../services/jellyfin.js";
 import { getById as getLibraryItem } from "../services/library.js";
@@ -21,6 +21,42 @@ const MIME: Record<string, string> = {
 /** Headers worth forwarding from the upstream Jellyfin response to the player. */
 const PASS_HEADERS = ["content-type", "content-length", "content-range", "accept-ranges"];
 
+/**
+ * Proxy a Jellyfin upstream (video or audio) to the client: forwards Range,
+ * hides the api_key, forwards the useful headers, and ties the upstream fetch to
+ * the client connection so aborted seeks/probes don't leak Jellyfin connections.
+ */
+async function proxyJellyfin(
+  req: FastifyRequest,
+  reply: FastifyReply,
+  upstreamUrl: string,
+  errLabel: string,
+): Promise<void> {
+  const headers: Record<string, string> = {};
+  if (req.headers.range) headers.range = req.headers.range;
+
+  const ac = new AbortController();
+  reply.raw.on("close", () => ac.abort());
+
+  let upstream: Response;
+  try {
+    upstream = await fetch(upstreamUrl, { headers, signal: ac.signal });
+  } catch {
+    return reply.code(502).send({ error: "Jellyfin unreachable" });
+  }
+  if (!upstream.ok && upstream.status !== 206) {
+    return reply.code(upstream.status === 404 ? 404 : 502).send({ error: errLabel });
+  }
+
+  reply.code(upstream.status);
+  for (const h of PASS_HEADERS) {
+    const v = upstream.headers.get(h);
+    if (v) reply.header(h, v);
+  }
+  if (!upstream.body) return reply.send();
+  return reply.send(Readable.fromWeb(upstream.body as Parameters<typeof Readable.fromWeb>[0]));
+}
+
 export async function streamRoutes(app: FastifyInstance): Promise<void> {
   // Proxy a Jellyfin direct-play stream. The api_key is injected server-side and
   // never reaches the browser; Range requests are forwarded for seeking.
@@ -28,27 +64,12 @@ export async function streamRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string };
     if (!ID_RE.test(id)) return reply.code(400).send({ error: "Invalid id" });
 
-    const upstreamUrl = buildStreamUrl(id, { transcode: false });
-    const headers: Record<string, string> = {};
-    if (req.headers.range) headers.range = req.headers.range;
+    // Mid-program join offset is baked into the transcode (the stream is not
+    // byte-seekable), so the browser can't seek client-side to reach it.
+    const rawOffset = Number((req.query as { offsetMs?: string }).offsetMs);
+    const offsetMs = Number.isFinite(rawOffset) && rawOffset > 0 ? rawOffset : 0;
 
-    let upstream: Response;
-    try {
-      upstream = await fetch(upstreamUrl, { headers });
-    } catch {
-      return reply.code(502).send({ error: "Jellyfin unreachable" });
-    }
-    if (!upstream.ok && upstream.status !== 206) {
-      return reply.code(upstream.status === 404 ? 404 : 502).send({ error: "Upstream stream error" });
-    }
-
-    reply.code(upstream.status);
-    for (const h of PASS_HEADERS) {
-      const v = upstream.headers.get(h);
-      if (v) reply.header(h, v);
-    }
-    if (!upstream.body) return reply.send();
-    return reply.send(Readable.fromWeb(upstream.body as Parameters<typeof Readable.fromWeb>[0]));
+    return proxyJellyfin(req, reply, buildStreamUrl(id, { offsetMs }), "Upstream stream error");
   });
 
   // Proxy a Jellyfin audio stream (weather-channel background music). Key hidden.
@@ -56,24 +77,7 @@ export async function streamRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string };
     if (!ID_RE.test(id)) return reply.code(400).send({ error: "Invalid id" });
 
-    const headers: Record<string, string> = {};
-    if (req.headers.range) headers.range = req.headers.range;
-    let upstream: Response;
-    try {
-      upstream = await fetch(buildAudioStreamUrl(id), { headers });
-    } catch {
-      return reply.code(502).send({ error: "Jellyfin unreachable" });
-    }
-    if (!upstream.ok && upstream.status !== 206) {
-      return reply.code(upstream.status === 404 ? 404 : 502).send({ error: "Upstream audio error" });
-    }
-    reply.code(upstream.status);
-    for (const h of PASS_HEADERS) {
-      const v = upstream.headers.get(h);
-      if (v) reply.header(h, v);
-    }
-    if (!upstream.body) return reply.send();
-    return reply.send(Readable.fromWeb(upstream.body as Parameters<typeof Readable.fromWeb>[0]));
+    return proxyJellyfin(req, reply, buildAudioStreamUrl(id), "Upstream audio error");
   });
 
   // Serve a locally-uploaded clip from the data volume, with Range support.

@@ -12,16 +12,20 @@ const TYPES: { value: LibraryItemType; label: string }[] = [
 /** "Make me a 90s sci-fi channel": pick genres/decades/types, preview, create. */
 export function AutoChannelWizard({ onCreated, onCancel }: { onCreated: () => void; onCancel: () => void }) {
   const [genres, setGenres] = useState<string[]>([]);
+  const [ratings, setRatings] = useState<string[]>([]);
   const [pickedGenres, setPickedGenres] = useState<Set<string>>(new Set());
   const [pickedDecades, setPickedDecades] = useState<Set<number>>(new Set());
   const [pickedTypes, setPickedTypes] = useState<Set<LibraryItemType>>(new Set());
+  const [pickedRatings, setPickedRatings] = useState<Set<string>>(new Set());
   const [number, setNumber] = useState("");
   const [name, setName] = useState("");
+  const [limit, setLimit] = useState(100);
   const [preview, setPreview] = useState<{ count: number; sample: string[] } | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
   useEffect(() => {
     api.genres().then(setGenres).catch(() => undefined);
+    api.ratings().then(setRatings).catch(() => undefined);
   }, []);
 
   const rules: AutoRules = useMemo(() => {
@@ -29,12 +33,14 @@ export function AutoChannelWizard({ onCreated, onCancel }: { onCreated: () => vo
     const r: AutoRules = {};
     if (pickedGenres.size) r.genres = [...pickedGenres];
     if (pickedTypes.size) r.types = [...pickedTypes];
+    if (pickedRatings.size) r.ratings = [...pickedRatings];
     if (decades.length) {
       r.yearFrom = decades[0];
       r.yearTo = decades[decades.length - 1] + 9;
     }
+    r.limit = limit;
     return r;
-  }, [pickedGenres, pickedTypes, pickedDecades]);
+  }, [pickedGenres, pickedTypes, pickedDecades, pickedRatings, limit]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -98,8 +104,32 @@ export function AutoChannelWizard({ onCreated, onCancel }: { onCreated: () => vo
         ))}
       </div>
 
+      {ratings.length > 0 && (
+        <>
+          <h3>Content rating <span className="muted small">(parental filter — optional)</span></h3>
+          <div className="chips">
+            {ratings.map((r) => (
+              <button key={r} type="button" className={pickedRatings.has(r) ? "chip on" : "chip"} onClick={() => toggle(pickedRatings, r, setPickedRatings)}>{r}</button>
+            ))}
+          </div>
+        </>
+      )}
+
+      <h3>Max episodes</h3>
+      <div className="row">
+        <input
+          type="number"
+          min={1}
+          max={2000}
+          value={limit}
+          onChange={(e) => setLimit(Math.max(1, Math.min(2000, Number(e.target.value) || 1)))}
+          style={{ width: 90 }}
+        />
+        <span className="muted small">most programs to pull into the loop</span>
+      </div>
+
       <p className="preview">
-        {preview ? <><b>{preview.count}</b> programs match{preview.sample.length ? ` — e.g. ${preview.sample.slice(0, 3).join(", ")}` : ""}.</> : "…"}
+        {preview ? <><b>{preview.count}</b> programs in the lineup{preview.sample.length ? ` — e.g. ${preview.sample.slice(0, 3).join(", ")}` : ""}.</> : "…"}
       </p>
 
       <form className="row" onSubmit={create}>

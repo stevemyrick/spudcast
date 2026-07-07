@@ -90,6 +90,12 @@ const migrations: string[] = [
   );
   CREATE INDEX idx_program_entries_lookup ON program_entries(channelId, startUtc, endUtc);
   `,
+  // 2 — richer metadata (program descriptions + content ratings) and per-channel lock
+  `
+  ALTER TABLE library_items ADD COLUMN overview TEXT;
+  ALTER TABLE library_items ADD COLUMN rating TEXT;
+  ALTER TABLE channels ADD COLUMN locked INTEGER NOT NULL DEFAULT 0;
+  `,
 ];
 
 /** Apply any pending migrations. Safe to call on every boot. */

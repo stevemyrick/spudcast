@@ -1,6 +1,14 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import type { Channel, ChannelWithItems, NowPlaying, ScheduledProgram } from "@spudcast/shared";
+import type {
+  Channel,
+  ChannelSchedule,
+  ChannelWithItems,
+  GuideGrid,
+  NowPlaying,
+  ScheduledProgram,
+  TvConfig,
+} from "@spudcast/shared";
 import { requireAuth, requireViewer } from "../auth-guards.js";
 import {
   addItems,
@@ -14,8 +22,9 @@ import {
   setOnAir,
   updateChannel,
 } from "../services/channels.js";
-import { getGuide, nowPlaying } from "../services/scheduler.js";
+import { getChannelSchedule, getGuide, getGuideUntil, nowPlaying } from "../services/scheduler.js";
 import { getById as getLibraryItem } from "../services/library.js";
+import { getDisplayTimezone } from "../services/settings.js";
 
 const rulesSchema = z.object({
   genres: z.array(z.string().max(64)).max(40).optional(),
@@ -24,6 +33,9 @@ const rulesSchema = z.object({
   types: z.array(z.enum(["movie", "episode", "commercial", "bumper", "music_video"])).optional(),
   sources: z.array(z.enum(["jellyfin", "youtube", "local"])).optional(),
   limit: z.number().int().min(1).max(2000).optional(),
+  excludeIds: z.array(z.number().int().positive()).max(5000).optional(),
+  order: z.array(z.number().int().positive()).max(5000).optional(),
+  ratings: z.array(z.string().max(24)).max(40).optional(),
 });
 
 const configSchema = z.object({
@@ -74,6 +86,8 @@ const updateSchema = z.object({
   iconUrl: z.string().max(2048).nullable().optional(),
   onAir: z.boolean().optional(),
   config: configSchema.optional(),
+  rules: rulesSchema.optional(),
+  locked: z.boolean().optional(),
 });
 
 /** Owner or admin may modify a channel. */
@@ -97,7 +111,10 @@ export async function channelRoutes(app: FastifyInstance): Promise<void> {
       return createChannel(req.currentUser!.id, parsed.data);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Create failed";
-      return reply.code(msg.includes("UNIQUE") ? 409 : 400).send({ error: msg });
+      if (msg.includes("UNIQUE")) {
+        return reply.code(409).send({ error: `Channel ${parsed.data.number} already exists — pick another number.` });
+      }
+      return reply.code(400).send({ error: msg });
     }
   });
 
@@ -122,7 +139,10 @@ export async function channelRoutes(app: FastifyInstance): Promise<void> {
       return updateChannel(channel.id, parsed.data)!;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Update failed";
-      return reply.code(msg.includes("UNIQUE") ? 409 : 400).send({ error: msg });
+      if (msg.includes("UNIQUE")) {
+        return reply.code(409).send({ error: `Channel ${parsed.data.number} already exists — pick another number.` });
+      }
+      return reply.code(400).send({ error: msg });
     }
   });
 
@@ -171,6 +191,11 @@ export async function channelRoutes(app: FastifyInstance): Promise<void> {
     return { ...channel, onAir };
   });
 
+  // Display config for the TV (timezone for the clock/program times).
+  app.get("/api/tv/config", { preHandler: requireViewer }, async (): Promise<TvConfig> => ({
+    timezone: getDisplayTimezone(),
+  }));
+
   // "What's on channel N now?" — reads only from the SQLite cache.
   app.get("/api/now-playing/:number", { preHandler: requireViewer }, async (req, reply): Promise<NowPlaying | void> => {
     const np = nowPlaying(Number((req.params as { number: string }).number));
@@ -181,5 +206,33 @@ export async function channelRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/guide/:number", { preHandler: requireViewer }, async (req): Promise<ScheduledProgram[]> => {
     const count = Math.min(Math.max(Number((req.query as { count?: string })?.count) || 8, 1), 50);
     return getGuide(Number((req.params as { number: string }).number), count);
+  });
+
+  // Current-loop schedule (program start/end times) for one channel's editor.
+  app.get("/api/channels/:id/schedule", { preHandler: requireAuth }, async (req, reply): Promise<ChannelSchedule | void> => {
+    const channel = getById(Number((req.params as { id: string }).id));
+    if (!channel) return reply.code(404).send({ error: "Channel not found" });
+    if (!canEdit(channel, req.currentUser!)) return reply.code(403).send({ error: "Not your channel" });
+    return { timezone: getDisplayTimezone(), programs: getChannelSchedule(channel) };
+  });
+
+  // Grid guide: every on-air channel's programs across a time window (default 3h).
+  app.get("/api/guide", { preHandler: requireViewer }, async (req): Promise<GuideGrid> => {
+    const hours = Math.min(Math.max(Number((req.query as { hours?: string })?.hours) || 3, 1), 12);
+    const nowMs = Date.now();
+    const endMs = nowMs + hours * 3600_000;
+    const onAir = listChannels({ onAirOnly: true });
+    const channels = onAir.map((channel) => {
+      if (channel.type === "weather") {
+        return { channel, programs: [], live: true };
+      }
+      return { channel, programs: getGuideUntil(channel, endMs, nowMs) };
+    });
+    return {
+      startUtc: new Date(nowMs).toISOString(),
+      endUtc: new Date(endMs).toISOString(),
+      timezone: getDisplayTimezone(),
+      channels,
+    };
   });
 }

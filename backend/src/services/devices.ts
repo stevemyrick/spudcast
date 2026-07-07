@@ -21,11 +21,12 @@ const pendingById = new Map<string, PendingPairing>();
 const pendingByCode = new Map<string, string>();
 
 function newCode(): string {
-  // Unambiguous characters (no 0/O/1/I) for reading off a TV screen.
+  // Unambiguous characters (no 0/O/1/I) for reading off a TV screen. The 32-char
+  // alphabet lets us mask the low 5 bits (bytes[i] & 31) for an unbiased pick.
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
   const bytes = randomBytes(6);
-  for (let i = 0; i < 6; i++) code += alphabet[bytes[i] % alphabet.length];
+  for (let i = 0; i < 6; i++) code += alphabet[bytes[i] & 31];
   return code;
 }
 

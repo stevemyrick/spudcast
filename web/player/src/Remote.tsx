@@ -18,13 +18,14 @@ export function Remote() {
 
   useEffect(() => () => wsRef.current?.close(), []);
 
-  function connect(e: React.FormEvent) {
-    e.preventDefault();
+  function connect(target: string) {
+    const room = target.trim().toUpperCase();
+    if (!room) return;
     setState("connecting");
     setError(null);
     const ws = new WebSocket(controlSocketUrl());
     wsRef.current = ws;
-    ws.onopen = () => ws.send(JSON.stringify({ role: "remote", code: code.trim().toUpperCase() }));
+    ws.onopen = () => ws.send(JSON.stringify({ role: "remote", code: room }));
     ws.onmessage = (ev) => {
       let msg: ControlServerMessage;
       try {
@@ -42,6 +43,16 @@ export function Remote() {
     ws.onclose = () => setState((s) => (s === "joined" ? "error" : s));
   }
 
+  // Deep-link from the TV's QR code: /tv/remote?room=CODE auto-joins.
+  useEffect(() => {
+    const room = new URLSearchParams(location.search).get("room");
+    if (room) {
+      setCode(room.toUpperCase());
+      connect(room);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function send(action: RemoteAction, number?: number) {
     wsRef.current?.send(JSON.stringify({ type: "command", action, number }));
   }
@@ -58,7 +69,7 @@ export function Remote() {
   if (state !== "joined") {
     return (
       <div className="remote">
-        <form className="remote-pair" onSubmit={connect}>
+        <form className="remote-pair" onSubmit={(e) => { e.preventDefault(); connect(code); }}>
           <h1 className="brand small">spudcast</h1>
           <p className="muted">Enter the code shown on your TV’s guide.</p>
           <input
@@ -84,7 +95,7 @@ export function Remote() {
       <div className="remote-pad">
         <div className="ch-rocker">
           <button onClick={() => send("channel_up")}>CH ▲</button>
-          <span>CH</span>
+          <button className="last-btn" onClick={() => send("last_channel")} title="Last channel">↩ Last</button>
           <button onClick={() => send("channel_down")}>CH ▼</button>
         </div>
 
@@ -97,8 +108,11 @@ export function Remote() {
 
         <div className="remote-actions">
           <button onClick={() => send("toggle_guide")}>Guide</button>
+          <button onClick={() => send("toggle_info")}>Info</button>
           <button onClick={() => send("toggle_mute")}>Mute</button>
           <button onClick={() => send("toggle_crt")}>CRT</button>
+          <button onClick={() => send("toggle_favorite")}>★ Fav</button>
+          <button onClick={() => send("favorites_only")}>Fav surf</button>
         </div>
       </div>
     </div>

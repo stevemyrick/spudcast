@@ -11,6 +11,8 @@ export interface JellyfinItem {
   Tags?: string[];
   SeriesName?: string;
   ImageTags?: Record<string, string>;
+  Overview?: string;
+  OfficialRating?: string;
 }
 
 interface ItemsResponse {
@@ -64,7 +66,7 @@ export async function listItems(params: ListItemsParams = {}): Promise<ItemsResp
   const q = new URLSearchParams({
     Recursive: "true",
     IncludeItemTypes: "Movie,Episode",
-    Fields: "Genres,Tags,ProductionYear,RunTimeTicks,Overview,SeriesName",
+    Fields: "Genres,Tags,ProductionYear,RunTimeTicks,Overview,SeriesName,OfficialRating",
     SortBy: "SortName",
     SortOrder: "Ascending",
     StartIndex: String(params.startIndex ?? 0),
@@ -86,23 +88,43 @@ export function ticksToMs(ticks: number | undefined): number {
 }
 
 export interface StreamUrlOptions {
+  /** Where to join the program, in ms (baked into the transcode via startTimeTicks). */
   offsetMs?: number;
-  /** When true, request an HLS transcode (handles non-browser-playable files). */
-  transcode?: boolean;
 }
 
 /**
  * Build an absolute Jellyfin stream URL for an item. Used server-side by the
  * stream proxy (M2) — the api_key never reaches the browser.
+ *
+ * We always ask Jellyfin to remux/transcode into a progressive MP4 (H.264/AAC).
+ * Most library files are MKV or carry codecs a browser's <video> can't decode
+ * (E-AC3, HEVC, …); a raw direct-play stream renders black in that case. When
+ * the source is already compatible H.264, Jellyfin stream-copies the video, so
+ * this is a cheap remux rather than a full re-encode. The stream is not
+ * byte-seekable, so mid-program joins are handled by startTimeTicks, not a
+ * client-side currentTime seek.
+ *
+ * A video stream-copy can only *start* at a keyframe, so a mid-program join
+ * would snap back to the previous keyframe (up to a GOP behind live). When an
+ * offset is requested we therefore disable video copy so Jellyfin does a
+ * frame-accurate seek and joins exactly at the live point. Offset 0 (start of an
+ * item, e.g. a program boundary) is already a keyframe, so it keeps the cheap copy.
  */
 export function buildStreamUrl(itemId: string, opts: StreamUrlOptions = {}): string {
   const { baseUrl, apiKey } = baseUrlOrThrow();
-  if (opts.transcode) {
-    const q = new URLSearchParams({ api_key: apiKey });
-    if (opts.offsetMs) q.set("startTimeTicks", String(opts.offsetMs * TICKS_PER_MS));
-    return `${baseUrl}/Videos/${itemId}/main.m3u8?${q.toString()}`;
+  const q = new URLSearchParams({
+    api_key: apiKey,
+    static: "false",
+    container: "mp4",
+    videoCodec: "h264",
+    audioCodec: "aac",
+  });
+  if (opts.offsetMs && opts.offsetMs > 0) {
+    q.set("startTimeTicks", String(Math.round(opts.offsetMs * TICKS_PER_MS)));
+    // Frame-accurate join: re-encode instead of copying to the prior keyframe.
+    q.set("allowVideoStreamCopy", "false");
   }
-  return `${baseUrl}/Videos/${itemId}/stream?static=true&api_key=${encodeURIComponent(apiKey)}`;
+  return `${baseUrl}/Videos/${itemId}/stream.mp4?${q.toString()}`;
 }
 
 /** Build a Jellyfin audio stream URL (for the weather channel's background music). */

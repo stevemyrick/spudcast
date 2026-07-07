@@ -82,6 +82,59 @@ export function nowPlayingForChannel(channel: Channel): NowPlaying | null {
 }
 
 /**
+ * The current loop iteration's program times, in broadcast order (incl. filler).
+ * Anchored to the start of the loop pass that's airing now, so times shift as
+ * items are reordered (durations re-accumulate) and advance when the loop
+ * restarts. Used by the channel editor's on-air schedule.
+ */
+export function getChannelSchedule(channel: Channel, nowMs = Date.now()): ScheduledProgram[] {
+  const state = loopState(channel, nowMs);
+  if (!state) return [];
+  const pos = (((nowMs - SCHEDULE_EPOCH) % state.totalMs) + state.totalMs) % state.totalMs;
+  const iterationStartMs = nowMs - pos; // wall-clock start of the current pass
+  const programs: ScheduledProgram[] = [];
+  let cursorMs = iterationStartMs;
+  for (const item of state.items) {
+    const dur = safeDuration(item);
+    programs.push({
+      item,
+      startUtc: new Date(cursorMs).toISOString(),
+      endUtc: new Date(cursorMs + dur).toISOString(),
+    });
+    cursorMs += dur;
+  }
+  return programs;
+}
+
+/**
+ * Forward walk of a channel's loop from now until `endMs`, for the grid guide.
+ * Guarded against pathological tiny-duration loops.
+ */
+export function getGuideUntil(
+  channel: Channel,
+  endMs: number,
+  nowMs = Date.now(),
+): ScheduledProgram[] {
+  const state = loopState(channel, nowMs);
+  if (!state) return [];
+  const programs: ScheduledProgram[] = [];
+  let cursorMs = state.currentStartMs;
+  let idx = state.index;
+  for (let guard = 0; cursorMs < endMs && guard < 1000; guard++) {
+    const item = state.items[idx];
+    const dur = safeDuration(item);
+    programs.push({
+      item,
+      startUtc: new Date(cursorMs).toISOString(),
+      endUtc: new Date(cursorMs + dur).toISOString(),
+    });
+    cursorMs += dur;
+    idx = (idx + 1) % state.items.length;
+  }
+  return programs;
+}
+
+/**
  * Upcoming programs for the on-screen guide, starting with what's on now.
  * Pure forward walk of the loop — no DB writes.
  */

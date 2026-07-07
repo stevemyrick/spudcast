@@ -98,7 +98,9 @@ describe("channel authorization (IDOR)", () => {
   });
 
   it("art proxy 404s (not 500s) when Jellyfin is unreachable", async () => {
-    const cookie = await setupAdmin(app); // baseUrl points at an unreachable host
+    // Point at a fast-refusing local port (not a DNS name, which can hang on
+    // mDNS resolution for seconds and blow the test timeout).
+    const cookie = await setupAdmin(app, { baseUrl: "http://127.0.0.1:1" });
     const res = await inj(app, cookie, {
       method: "GET",
       url: "/api/art/jellyfin/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

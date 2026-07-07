@@ -22,10 +22,11 @@ const roomsByCode = new Map<string, Room>();
 const roomByTv = new Map<Socket, Room>();
 
 function newCode(): string {
+  // 32-char alphabet → mask the low 5 bits (bytes[i] & 31) for an unbiased pick.
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
-  const bytes = randomBytes(4);
-  for (let i = 0; i < 4; i++) code += alphabet[bytes[i] % alphabet.length];
+  const bytes = randomBytes(6);
+  for (let i = 0; i < 6; i++) code += alphabet[bytes[i] & 31];
   return code;
 }
 

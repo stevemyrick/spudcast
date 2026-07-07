@@ -14,7 +14,7 @@ describe("remote-control hub", () => {
     const remote = fakeSocket();
 
     const code = openRoom(tv.sock);
-    expect(code).toMatch(/^[A-Z0-9]{4}$/);
+    expect(code).toMatch(/^[A-Z0-9]{6}$/);
     expect(tv.sent).toContainEqual({ type: "room", code });
 
     expect(joinRoom(code, remote.sock)).toBe(true);
